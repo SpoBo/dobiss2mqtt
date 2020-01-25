@@ -51,15 +51,22 @@ const HEADER_DEFAULTS = {
 // It sends 16bit buffers, delimited by 175 for start and end.
 // HeaderStruct.cs
 function createHeaderPayload(options) {
-    const { code, type, address, high, low, colMaxCount, rowCount, colDataCount } = { HEADER_DEFAULTS, ...options };
+    const {
+        code,
+        type,
+        relais,
+        high,
+        low,
+        colMaxCount,
+        rowCount,
+        colDataCount
+    } = { ...HEADER_DEFAULTS, ...options };
 
-    console.log({ address, code, high })
-    // 255 = Byte.MaxValue
     return new Buffer.from([
         175,
         code,
         type,
-        address,
+        relais,
         high,
         low,
         colMaxCount,
@@ -80,17 +87,17 @@ function createHeaderPayload(options) {
  * @param {number} type
  * @param {number} address
  */
-function createActionHeaderPayload({ type, address }) {
-    return createHeaderPayload({ type, address, code: 2 });
+function createActionHeaderPayload({ type, relais }) {
+    return createHeaderPayload({ type, relais, code: 2 });
 }
 
 function createSimpleActionBuffer({ relais, output, action }) {
-    return new Buffer.from([relais, output, action, 255, 255]);
+    return new Buffer.from([relais, output, action, 255, 255, 64, 255, 255]);
 }
 
-function writeHexBufferToSocket(socket, hexBuffer) {
-    debug('writing hex %s', hexBuffer);
-    socket.write(hexBuffer);
+function writeHexBufferToSocket(socket, buffer) {
+    debug('writing hex %o, ascii: %o', buffer.toString('hex'), bufferToByteArray(buffer));
+    socket.write(buffer);
     debug('done writing');
 }
 
@@ -102,7 +109,7 @@ function performRelayAction(relais, output, action = 0x02) {
     const header = createActionHeaderPayload(
         {
             type: 8,
-            address: relais
+            relais
         }
     )
     const body = createSimpleActionBuffer(
@@ -193,8 +200,7 @@ socket.on('close', function() {
 
 socket.on('data', function(d) {
     const byteArray = bufferToByteArray(d);
-    debug('received raw data %s', byteArray);
-    // TODO: convert this to HEX
+    debug('received hex %o, ascii %o', d.toString('hex'), byteArray)
 })
 
 socket.on('drain', function() {

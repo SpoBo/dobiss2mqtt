@@ -1,20 +1,25 @@
 const { Socket } = require('net');
 const debug = require('debug')('dobiss')
+
+const ip = '10.0.0.8';
+const port = 10001;
+
 // CANBUS NOT MODBUS !!!
 // https://www.csselectronics.com/screen/page/can-bus-logger-downloads
 // https://sicherheitskritisch.de/2018/05/can-bus-asysbus-component-for-smart-home-system-home-assistant-en/
 // https://harrisonsand.com/can-on-the-raspberry-pi/
 // https://circuitdigest.com/microcontroller-projects/arduino-can-tutorial-interfacing-mcp2515-can-bus-module-with-arduino
 // heb module besteld voor het via een pi te doen
+
 const exits = [
     [
         "berging", // 1.1
-        "koele berging", // 1.2
-        "wc",
-        "inkomhal",
-        "inkomdeur",
-        "salon",
-        "eetplaats",
+        "koele_berging", // 1.2
+        "wc", // 1.3
+        "inkomhal", // 1.4
+        "inkomdeur", // 1.5
+        "salon", // 1.6
+        "eetplaats", // 1.7
         "keuken",
         "terras",
         "badkamer",
@@ -31,97 +36,133 @@ const exits = [
     ]
 ]
 
-const switches = [
-    [
-        "nachthal_stairs_left",
-        "nachthal_stairs_right",
-        "nachthal_end_left",
-        "nachthal_end_right",
-        "office",
-        "fitness",
-        "master_bedroom",
-        "dressing",
-        "nachthal_zolder",
-        "zolder_1",
-        "zolder_2"
-    ],
-    [
-        "berging",
-        "koele_berging",
-        "traphal_beneden",
-        "keuken_left_top",
-        "keuken_right_top",
-        "keuken_right_bottom",
-        "keuken_left_bottom",
-        "dinner_left_top",
-        "dinner_right_top",
-        "dinner_right_bottom",
-        "dinner_left_top",
-        "salon_left",
-        "salon_right",
-        "inkomhal_single",
-        "inkomhal_left",
-        "inkomhal_right",
-        "toilet",
-        "kitchen_counter",
-        "bathroom"
-    ]
-    
-]
-
 // https://community.home-assistant.io/t/tcp-commands-for-ethernet-relay/84830/8
 
-// modbus poll / modbus slave apps (don't work because there's an IP translation layer due to Dobiss CAN Programmer)
-// What app did I use to decompile Dobiss Can Programmer ? dotPeek (JetBrains)
-
-// The goal is to read shit from the CAN bus via the LAN interface.
-// The ideal scenario is that I can intercept the remote signals and pass those actions off to node-red or HASS.
-// This way I can leave all lights on all t he time by disconnecting the switches from Dobiss and then making the switches send commands to HASS / Hue instead.
-// Plan B is to just be able to turn on or off lights. This would allow me to turn on the light when HASS turns on the light should not not be on yet.
-const ip = '10.0.0.8';
-const port = 10001;
 const socket = new Socket();
+
+const HEADER_DEFAULTS = {
+    high: 0,
+    low: 0,
+    colMaxCount: 8,
+    rowCount: 1,
+    colDataCount: 8
+}
 
 // It sends 16bit buffers, delimited by 175 for start and end.
 // HeaderStruct.cs
-function createHeaderPayload({ code, type, address, high, low, colMaxCount, rowCount, colDataCount }) {
+function createHeaderPayload(options) {
+    const { code, type, address, high, low, colMaxCount, rowCount, colDataCount } = { HEADER_DEFAULTS, ...options };
+
+    console.log({ address, code, high })
     // 255 = Byte.MaxValue
-    return new Buffer.from([0XAF, code, type, address, high, low, colMaxCount, rowCount, colDataCount, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XFF, 0XAF]);
+    return new Buffer.from([
+        175,
+        code,
+        type,
+        address,
+        high,
+        low,
+        colMaxCount,
+        rowCount,
+
+        colDataCount,
+        255,
+        255,
+        255,
+        255,
+        255,
+        255,
+        175
+    ]);
 }
 
 /**
- * 
  * @param {number} type
  * @param {number} address
  */
 function createActionHeaderPayload({ type, address }) {
-    return createHeaderPayload({ type, address, code: 2, high: 0, low: 0, colMaxCount: 8, rowCount: 1, colDataCount: 8});
+    return createHeaderPayload({ type, address, code: 2 });
 }
 
-function createSimpleActionBuffer({ address, output, action }) {
-    return new Buffer.from([address, output, action, 255, 255]);
+function createSimpleActionBuffer({ relais, output, action }) {
+    return new Buffer.from([relais, output, action, 255, 255]);
 }
 
-function bufferToByteArray(buffer) {
-    const hexString = buffer.toString('hex');
-    var hex = hexString.toString();
-    var ints = [];
-    // grab by the pairs and convert to ints
-    for (var i = 0; i < hex.length; i += 2) {
-        ints.push(parseInt(hex.substr(i, 2), 16));
+function writeHexBufferToSocket(socket, hexBuffer) {
+    debug('writing hex %s', hexBuffer);
+    socket.write(hexBuffer);
+    debug('done writing');
+}
+
+function writeBuffersToSocket(...buff) {
+    writeHexBufferToSocket(socket, Buffer.concat(buff))
+}
+
+function performRelayAction(relais, output, action = 0x02) {
+    const header = createActionHeaderPayload(
+        {
+            type: 8,
+            address: relais
+        }
+    )
+    const body = createSimpleActionBuffer(
+        {
+            relais,
+            output,
+            action
+        }
+    )
+
+    writeBuffersToSocket(header, body)
+}
+
+function pingForState(relais) {
+    writeRawHEXToSocket(
+        [
+            0xAF,
+            0x01,
+            0x08,
+            relais,
+            0x00,
+            0x00,
+            0x00,
+            0x01,
+
+            0x00,
+            0xFF,
+            0xFF,
+            0xFF,
+            0xFF,
+            0xFF,
+            0xFF,
+            0xAF,
+        ]
+    )
+}
+
+function getLocation(name) {
+    let relay;
+    let output;
+    let found;
+
+    for (relay = 1; relay < exits.length + 1; relay++) {
+        for (output = 0; relay < exits[relay - 1].length; output++) {
+            if (exits[relay - 1][output] === name) {
+                found = true;
+                break;
+            }
+        }
+
+        if (found) {
+            break;
+        }
     }
-    return ints;
-}
 
-function writeRawHEXToSocket(hexArray) {
-    debug('writing hex %s', hexArray);
+    if (!found) {
+        return null
+    }
 
-    socket.write(
-        // NOTE: This seems to be like a fixed wakeup header.
-        new Buffer.from(hexArray)
-    );
-
-    debug('done writing')
+    return [ relay, output ]
 }
 
 socket.on('connect', function() {
@@ -132,55 +173,18 @@ socket.on('connect', function() {
 
     // import programmer version? MainWindow.Com.ImportProgrammerVersion();
 
-    // turn on my light
-    // first send an action header to do something on relais 1
-    // not sure what the type and address should be :'(
-    //socket.write(createActionHeaderPayload({ type: 0X00 /* relais */, address: 0X08, action: 0X02 /* toggle */ }))
-
-    // action header
-    setTimeout(function() {
-        const outputAddress = 0x01; // relais 1. also have relais 2.
-        const outputID = 0x01;
-
-        // NOTE: This seems to be like a fixed wakeup header.
-        writeRawHEXToSocket(
-            [
-                0xAF,
-                0x02,
-                0x08,
-                0x01,
-                0x00,
-                0x00,
-                0x08,
-                0x01,
-                0x08,
-                0xFF,
-                0xFF,
-                0xFF,
-                0xFF,
-                0xFF,
-                0xFF,
-                0xAF
-            ]
-        );
-
-        // action body (immediately after)
-        writeRawHEXToSocket(
-            [
-                outputAddress,
-                outputID,
-                0x02, // 0x00 off, 0x01 on, 0x02 toggle
-                0xFF,
-                0xFF,
-                0x64,
-                0xFF,
-                0xFF
-            ]
-        )
+    // toggle my light
+    setInterval(() => {
+        //pingForState(0x02)
     }, 500)
 
-    // then say that we want to turn on port 4 on relais 1 ? action = 1 = on (relais met module 1, uitgang 4 = inkomhal)
-    //setTimeout(() => socket.write(createSimpleActionBuffer({ address: 1, output: 4, action: 1 })), 1000)
+    const location = getLocation('eetplaats')
+
+    console.log({ location })
+
+    if (location) {
+        performRelayAction(...location)
+    }
 })
 
 socket.on('close', function() {
@@ -217,3 +221,51 @@ socket.on('timeout', function() {
 debug('going to connect')
 socket
     .connect({ host: ip, port });
+
+const switches = [
+    [
+        "nachthal_stairs_left",
+        "nachthal_stairs_right",
+        "nachthal_end_left",
+        "nachthal_end_right",
+        "office",
+        "fitness",
+        "master_bedroom",
+        "dressing",
+        "nachthal_zolder",
+        "zolder_1",
+        "zolder_2"
+    ],
+    [
+        "berging",
+        "koele_berging",
+        "traphal_beneden",
+        "keuken_left_top",
+        "keuken_right_top",
+        "keuken_right_bottom",
+        "keuken_left_bottom",
+        "dinner_left_top",
+        "dinner_right_top",
+        "dinner_right_bottom",
+        "dinner_left_top",
+        "salon_left",
+        "salon_right",
+        "inkomhal_single",
+        "inkomhal_left",
+        "inkomhal_right",
+        "toilet",
+        "kitchen_counter",
+        "bathroom"
+    ]
+]
+
+function bufferToByteArray(buffer) {
+    const hexString = buffer.toString('hex');
+    var hex = hexString.toString();
+    var ints = [];
+    // grab by the pairs and convert to ints
+    for (var i = 0; i < hex.length; i += 2) {
+        ints.push(parseInt(hex.substr(i, 2), 16));
+    }
+    return ints;
+}

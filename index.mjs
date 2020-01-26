@@ -1,42 +1,9 @@
-const { Socket } = require('net');
-const debug = require('debug')('dobiss')
+import config from './config.mjs';
 
-const ip = '10.0.0.8';
-const port = 10001;
+import { Socket } from 'net';
+import DEBUG from 'debug';
 
-// CANBUS NOT MODBUS !!!
-// https://www.csselectronics.com/screen/page/can-bus-logger-downloads
-// https://sicherheitskritisch.de/2018/05/can-bus-asysbus-component-for-smart-home-system-home-assistant-en/
-// https://harrisonsand.com/can-on-the-raspberry-pi/
-// https://circuitdigest.com/microcontroller-projects/arduino-can-tutorial-interfacing-mcp2515-can-bus-module-with-arduino
-// heb module besteld voor het via een pi te doen
-
-const exits = [
-    [
-        "berging", // 1.1
-        "koele_berging", // 1.2
-        "wc", // 1.3
-        "inkomhal", // 1.4
-        "inkomdeur", // 1.5
-        "salon", // 1.6
-        "eetplaats", // 1.7
-        "keuken",
-        "terras",
-        "badkamer",
-        "master_bedroom",
-        "dressing"
-    ],
-    [
-        "nachthal", // 2.1
-        "fitness",
-        "office",
-        "traphal",
-        "zolder_1",
-        "zolder_2",
-    ]
-]
-
-// https://community.home-assistant.io/t/tcp-commands-for-ethernet-relay/84830/8
+const debug = DEBUG('dobiss');
 
 const socket = new Socket();
 
@@ -48,8 +15,7 @@ const HEADER_DEFAULTS = {
     colDataCount: 8
 }
 
-// It sends 16bit buffers, delimited by 175 for start and end.
-// HeaderStruct.cs
+// A header is a 16bit buffer, Delimited by 175 for start and end.
 function createHeaderPayload(options) {
     const {
         code,
@@ -124,27 +90,14 @@ function performRelayAction(relais, output, action = 0x02) {
 }
 
 function pingForState(relais) {
-    writeRawHEXToSocket(
-        [
-            0xAF,
-            0x01,
-            0x08,
-            relais,
-            0x00,
-            0x00,
-            0x00,
-            0x01,
+    const buff = createHeaderPayload({
+        code: 1,
+        relais,
+        type: 8, // don't know what 8 is ... .
+        colDataCount: 0 // don't know why it needs to be 0 for data. maybe to allow a bigger response?
+    })
 
-            0x00,
-            0xFF,
-            0xFF,
-            0xFF,
-            0xFF,
-            0xFF,
-            0xFF,
-            0xAF,
-        ]
-    )
+    writeBuffersToSocket(buff)
 }
 
 function getLocation(name) {
@@ -152,9 +105,9 @@ function getLocation(name) {
     let output;
     let found;
 
-    for (relay = 1; relay < exits.length + 1; relay++) {
-        for (output = 0; relay < exits[relay - 1].length; output++) {
-            if (exits[relay - 1][output] === name) {
+    for (relay = 1; relay < config.exits.length + 1; relay++) {
+        for (output = 0; relay < config.exits[relay - 1].length; output++) {
+            if (config.exits[relay - 1][output] === name) {
                 found = true;
                 break;
             }
@@ -175,16 +128,11 @@ function getLocation(name) {
 socket.on('connect', function() {
     debug('connected');
 
-    // say hello
-    // socket.write(createPayloadBuffer({ code: 5 }));
-
-    // import programmer version? MainWindow.Com.ImportProgrammerVersion();
-
-    // toggle my light
+        pingForState(0x01)
     setInterval(() => {
-        //pingForState(0x02)
     }, 500)
 
+    return;
     const location = getLocation('eetplaats')
 
     console.log({ location })
@@ -223,47 +171,9 @@ socket.on('timeout', function() {
     console.log('timeout');
 })
 
-// @TODO: Autodiscover ? There is an autodiscover header ... but we still need to send that somewhere :|
 debug('going to connect')
 socket
-    .connect({ host: ip, port });
-
-const switches = [
-    [
-        "nachthal_stairs_left",
-        "nachthal_stairs_right",
-        "nachthal_end_left",
-        "nachthal_end_right",
-        "office",
-        "fitness",
-        "master_bedroom",
-        "dressing",
-        "nachthal_zolder",
-        "zolder_1",
-        "zolder_2"
-    ],
-    [
-        "berging",
-        "koele_berging",
-        "traphal_beneden",
-        "keuken_left_top",
-        "keuken_right_top",
-        "keuken_right_bottom",
-        "keuken_left_bottom",
-        "dinner_left_top",
-        "dinner_right_top",
-        "dinner_right_bottom",
-        "dinner_left_top",
-        "salon_left",
-        "salon_right",
-        "inkomhal_single",
-        "inkomhal_left",
-        "inkomhal_right",
-        "toilet",
-        "kitchen_counter",
-        "bathroom"
-    ]
-]
+    .connect({ host: config.dobiss.ip, port: config.dobiss.port });
 
 function bufferToByteArray(buffer) {
     const hexString = buffer.toString('hex');

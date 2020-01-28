@@ -3,7 +3,7 @@ import DEBUG from "debug";
 import { Socket } from "net";
 
 import { convertBufferToByteArray } from "./helpers";
-const config = require("../config");
+const config = require(process.env.CONFIG_PATH || "../config");
 
 const debug = DEBUG("dobiss");
 
@@ -63,14 +63,14 @@ function createSimpleActionBuffer(options: { relais: number, output: number, act
     return Buffer.from([options.relais, options.output, options.action, 255, 255, 64, 255, 255]);
 }
 
-function writeHexBufferToSocket (socket: Socket, buffer: Buffer) {
+function writeHexBufferToSocket (buffer: Buffer) {
     debug("writing hex %o, ascii: %o", buffer.toString("hex"), convertBufferToByteArray(buffer));
     socket.write(buffer);
     debug("done writing");
 }
 
 function writeBuffersToSocket (...buff: Buffer[]) {
-    writeHexBufferToSocket(socket, Buffer.concat(buff));
+    writeHexBufferToSocket(Buffer.concat(buff));
 }
 
 function performRelayAction(relais: number, output: number, action: number) {
@@ -132,7 +132,6 @@ function getLocation (name: string): Location | null {
 
 socket.on("connect", () => {
     debug("connected");
-
 
     //pingForState(0x01);
 

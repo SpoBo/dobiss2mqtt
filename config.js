@@ -1,4 +1,4 @@
-export default {
+module.exports = {
     dobiss: {
         ip: '10.0.0.8',
         port: 10001

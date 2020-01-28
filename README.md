@@ -30,7 +30,7 @@ states of the lights. So it's important to not hog the socket connection if it's
 not needed. That said, it's kind of needed because we need to constantly ping
 the CAN Programmer to check the state of the relay outputs.
 
-It uses RxJS internally because RxJS is noice.
+It will use RxJS internally because RxJS is noice.
 
 Here's how it should work internally:
 

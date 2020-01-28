@@ -92,7 +92,7 @@ function performRelayAction(relais: number, output: number, action: number) {
     writeBuffersToSocket(header, body);
 }
 
-function pingForState (relais: number) {
+function pingForState ({ relais }: { relais: number }) {
     const buff = createHeaderPayload({
         code: 1,
         colDataCount: 0, // don't know why it needs to be 0 for data. maybe to allow a bigger response?
@@ -133,14 +133,15 @@ function getLocation (name: string): Location | null {
 socket.on("connect", () => {
     debug("connected");
 
-    //pingForState(0x01);
+    pingForState({ relais: 0x01 });
+    pingForState({ relais: 0x02 });
 
     const location = getLocation("salon");
 
     console.log({ location });
 
     if (location) {
-        performRelayAction(location.relay, location.output, 0x02);
+        //performRelayAction(location.relay, location.output, 0x02);
     }
 });
 
@@ -148,28 +149,28 @@ socket.on("close", () => {
     console.log("close");
 });
 
-socket.on("data", function(d) {
+socket.on("data", (d) => {
     const byteArray = convertBufferToByteArray(d);
     debug("received hex %o, ascii %o", d.toString("hex"), byteArray);
 });
 
-socket.on("drain", function() {
+socket.on("drain", () => {
     console.log("drain");
 });
 
-socket.on("end", function() {
+socket.on("end", () => {
     console.log("end");
 });
 
-socket.on("error", function(e) {
+socket.on("error", (e) => {
     console.log("error", e.message);
 });
 
-socket.on("lookup", function() {
+socket.on("lookup", () => {
     console.log("lookup");
 });
 
-socket.on("timeout", function() {
+socket.on("timeout", () => {
     console.log("timeout");
 });
 

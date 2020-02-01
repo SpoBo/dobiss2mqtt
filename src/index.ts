@@ -1,67 +1,13 @@
-
 import DEBUG from "debug";
 import { Socket } from "net";
-
+import { createPingForState, createRelayAction } from "./dobiss";
 import { convertBufferToByteArray } from "./helpers";
+
 const config = require(process.env.CONFIG_PATH || "../config");
 
 const debug = DEBUG("dobiss");
 
 const socket = new Socket();
-
-const HEADER_DEFAULTS = {
-    colDataCount: 8,
-    colMaxCount: 8,
-    high: 0,
-    low: 0,
-    rowCount: 1,
-};
-
-// A header is a 16bit buffer, Delimited by 175 for start and end.
-function createHeaderPayload (options: { code: number, type: number, relais: number, colDataCount?: number }) {
-    const {
-        code,
-        type,
-        relais,
-        high,
-        low,
-        colMaxCount,
-        rowCount,
-        colDataCount,
-    } = { ...HEADER_DEFAULTS, ...options };
-
-    return Buffer.from([
-        175,
-        code,
-        type,
-        relais,
-        high,
-        low,
-        colMaxCount,
-        rowCount,
-
-        colDataCount,
-        255,
-        255,
-        255,
-        255,
-        255,
-        255,
-        175,
-    ]);
-}
-
-/**
- * @param {number} type
- * @param {number} address
- */
-function createActionHeaderPayload (options: { type: number, relais: number }) {
-    return createHeaderPayload({ type: options.type, relais: options.relais, code: 2 });
-}
-
-function createSimpleActionBuffer(options: { relais: number, output: number, action: number }): Buffer {
-    return Buffer.from([options.relais, options.output, options.action, 255, 255, 64, 255, 255]);
-}
 
 function writeHexBufferToSocket (buffer: Buffer) {
     debug("writing hex %o, ascii: %o", buffer.toString("hex"), convertBufferToByteArray(buffer));
@@ -71,36 +17,6 @@ function writeHexBufferToSocket (buffer: Buffer) {
 
 function writeBuffersToSocket (...buff: Buffer[]) {
     writeHexBufferToSocket(Buffer.concat(buff));
-}
-
-function performRelayAction(relais: number, output: number, action: number) {
-    const header = createActionHeaderPayload(
-        {
-            type: 8,
-            relais,
-        },
-    );
-
-    const body = createSimpleActionBuffer(
-        {
-            relais,
-            output,
-            action,
-        },
-    );
-
-    writeBuffersToSocket(header, body);
-}
-
-function pingForState ({ relais }: { relais: number }) {
-    const buff = createHeaderPayload({
-        code: 1,
-        colDataCount: 0, // don't know why it needs to be 0 for data. maybe to allow a bigger response?
-        relais,
-        type: 8, // don't know what 8 is ... .
-    });
-
-    writeBuffersToSocket(buff);
 }
 
 type Location = { relay: number, output: number };
@@ -133,15 +49,15 @@ function getLocation (name: string): Location | null {
 socket.on("connect", () => {
     debug("connected");
 
-    pingForState({ relais: 0x01 });
-    pingForState({ relais: 0x02 });
+    writeBuffersToSocket(createPingForState({ relais: 0x01 }));
+    writeBuffersToSocket(createPingForState({ relais: 0x02 }));
 
     const location = getLocation("salon");
 
     console.log({ location });
 
     if (location) {
-        //performRelayAction(location.relay, location.output, 0x02);
+        writeBuffersToSocket(createRelayAction(location.relay, location.output, 0x02));
     }
 });
 

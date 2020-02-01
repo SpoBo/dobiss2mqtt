@@ -3,8 +3,8 @@ import { createPingForState, createRelayAction } from "./dobiss";
 import { convertBufferToByteArray } from "./helpers";
 import socket, { SocketClient } from "./rx-socket";
 import { Socket } from "net";
-import { ReplaySubject } from "rxjs";
-import { refCount, multicast } from "rxjs/operators";
+import { ReplaySubject, from, empty } from "rxjs";
+import { refCount, multicast, map, switchMap } from "rxjs/operators";
 
 const config = require(process.env.CONFIG_PATH || "../config");
 // TODO: create an API around the config. Could become streamable config.
@@ -62,22 +62,45 @@ socket.on("connect", () => {
 });
 */
 
-const socket$ = socket({ host: config.dobiss.host, port: config.dobiss.port });
+const socket$ = socket({ host: config.dobiss.host, port: config.dobiss.port })
     //.pipe(multicast(() => new ReplaySubject(1), refCount()))
 
-const client = socket$
-    .subscribe((instance: SocketClient) => {
-        const location = getLocation("salon");
+const toggleSalon = { action: "toggle", location: "salon"};
 
-        console.log({ location });
+const commands$ = from([
+    toggleSalon,
+    //toggleSalon,
+]);
 
-        if (location) {
-            instance
-                .send(createRelayAction(location.relay, location.output, 0x02))
-                .subscribe(() => {
-                    console.log('toggled', location);
-                });
-        }
+const processor$ = commands$
+     // TODO: split up in actions and polls.
+    .pipe(
+        map((item) => {
+            return getLocation(item.location);
+        }),
+        switchMap((location) => {
+            if (!location) {
+                return empty();
+            }
+
+            return socket$
+                .pipe(switchMap((client) => {
+                    const buffer = createRelayAction(location.relay, location.output, 0x02)
+
+                    if (buffer) {
+                        return client.send(buffer);
+                    }
+
+                    return empty();
+                }))
+        })
+    );
+
+const client = processor$
+    .subscribe({
+        next: (out: any) => {
+            console.log("out", out);
+        },
     });
 
 setTimeout(() => {

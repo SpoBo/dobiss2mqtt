@@ -1,6 +1,7 @@
 import { convertBufferToByteArray } from "./helpers";
 import DEBUG from "debug";
-import { Observable } from "rxjs";
+import { Observable, queueScheduler } from "rxjs";
+import { observeOn } from "rxjs/operators";
 import { Socket, SocketConnectOpts } from "net";
 
 const debug = DEBUG("dobiss2mqtt.socket");
@@ -13,20 +14,20 @@ export class SocketClient {
     }
 
     public send(input: Buffer): Observable<Buffer> {
-        // TODO: create a queue mechanism.
-        //       we could ask for a slot on the queue and be nexted when it's our time.
-        return new Observable((subscriber) => {
-            debug("writing hex %o, ascii: %o", input.toString("hex"), convertBufferToByteArray(input));
-            this.socket.write(input);
+        return new Observable(
+            (subscriber) => {
+                debug("writing hex %o, ascii: %o", input.toString("hex"), convertBufferToByteArray(input));
+                this.socket.write(input);
 
-            this.socket.once("data", (output) => {
-                const byteArray = convertBufferToByteArray(output);
-                debug("received hex %o, ascii %o", output.toString("hex"), byteArray);
+                this.socket.once("data", (output) => {
+                    const byteArray = convertBufferToByteArray(output);
+                    debug("received hex %o, ascii %o", output.toString("hex"), byteArray);
 
-                subscriber.next(output);
-                subscriber.complete();
-            });
-        });
+                    subscriber.next(output);
+                    subscriber.complete();
+                });
+            })
+            .pipe((v) => observeOn(queueScheduler)(v) as Observable<Buffer>);
     }
 }
 

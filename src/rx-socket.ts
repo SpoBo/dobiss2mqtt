@@ -27,7 +27,9 @@ export class SocketClient {
                     subscriber.complete();
                 });
             })
-            .pipe((v) => observeOn(queueScheduler)(v) as Observable<Buffer>);
+            .pipe(
+                (v) => observeOn(queueScheduler)(v) as Observable<Buffer>,
+            );
     }
 }
 

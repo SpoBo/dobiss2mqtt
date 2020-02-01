@@ -1,6 +1,7 @@
 module.exports = {
     dobiss: {
-        ip: '10.0.0.8',
+        // NOTE: this maps to the first argument of socketInstance.connect
+        host: '10.0.0.8',
         port: 10001
     },
     mqtt: {

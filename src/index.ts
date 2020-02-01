@@ -1,22 +1,21 @@
 import DEBUG from "debug";
-import { Socket } from "net";
 import { createPingForState, createRelayAction } from "./dobiss";
 import { convertBufferToByteArray } from "./helpers";
+import socket, { SocketClient } from "./rx-socket";
+import { Socket } from "net";
+import { ReplaySubject } from "rxjs";
+import { refCount, multicast } from "rxjs/operators";
 
 const config = require(process.env.CONFIG_PATH || "../config");
+// TODO: create an API around the config. Could become streamable config.
 
-const debug = DEBUG("dobiss");
+const debug = DEBUG("dobiss2mqtt.index");
 
-const socket = new Socket();
-
-function writeHexBufferToSocket (buffer: Buffer) {
-    debug("writing hex %o, ascii: %o", buffer.toString("hex"), convertBufferToByteArray(buffer));
+// TODO: This needs to be all up inside the socket API ... .
+function writeBuffersToSocket (socket: Socket, ...buff: Buffer[]) {
+    const buffer = Buffer.concat(buff);
     socket.write(buffer);
     debug("done writing");
-}
-
-function writeBuffersToSocket (...buff: Buffer[]) {
-    writeHexBufferToSocket(Buffer.concat(buff));
 }
 
 type Location = { relay: number, output: number };
@@ -46,6 +45,7 @@ function getLocation (name: string): Location | null {
     return { relay, output } as Location;
 }
 
+/*
 socket.on("connect", () => {
     debug("connected");
 
@@ -60,36 +60,26 @@ socket.on("connect", () => {
         writeBuffersToSocket(createRelayAction(location.relay, location.output, 0x02));
     }
 });
+*/
 
-socket.on("close", () => {
-    console.log("close");
-});
+const socket$ = socket({ host: config.dobiss.host, port: config.dobiss.port });
+    //.pipe(multicast(() => new ReplaySubject(1), refCount()))
 
-socket.on("data", (d) => {
-    const byteArray = convertBufferToByteArray(d);
-    debug("received hex %o, ascii %o", d.toString("hex"), byteArray);
-});
+const client = socket$
+    .subscribe((instance: SocketClient) => {
+        const location = getLocation("salon");
 
-socket.on("drain", () => {
-    console.log("drain");
-});
+        console.log({ location });
 
-socket.on("end", () => {
-    console.log("end");
-});
+        if (location) {
+            instance
+                .send(createRelayAction(location.relay, location.output, 0x02))
+                .subscribe(() => {
+                    console.log('toggled', location);
+                });
+        }
+    });
 
-socket.on("error", (e) => {
-    console.log("error", e.message);
-});
-
-socket.on("lookup", () => {
-    console.log("lookup");
-});
-
-socket.on("timeout", () => {
-    console.log("timeout");
-});
-
-debug("going to connect");
-socket
-    .connect({ host: config.dobiss.ip, port: config.dobiss.port });
+setTimeout(() => {
+    client.unsubscribe();
+}, 1000);

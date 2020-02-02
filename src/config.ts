@@ -16,7 +16,7 @@ export interface IDobissConfig {
 }
 
 export interface IMqttConfig {
-
+    url: string;
 }
 
 export default class ConfigManager {
@@ -64,7 +64,12 @@ export default class ConfigManager {
     }
 
     public get mqtt$(): Observable<IMqttConfig> {
-        return empty();
+        return this.config$
+            .pipe(
+                map((config) => {
+                    return config.mqtt;
+                }),
+            );
     }
 
 }

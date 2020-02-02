@@ -20,6 +20,7 @@ import {
     filter,
     map,
     switchMap,
+    tap,
 } from "rxjs/operators";
 
 import { RxMqtt } from "./rx-mqtt";
@@ -47,8 +48,6 @@ interface IPollAction extends IActionType {
     location: number;
 };
 
-// TODO: create an API around the config. Could become streamable config.
-
 const debug = DEBUG("dobiss2mqtt.index");
 
 const configManager = new ConfigManager(process.env.CONFIG_PATH || "../config");
@@ -68,9 +67,9 @@ const state$ = configManager
  *
  * But now we will not need to restart the service when the config changes :p
  */
-const processor$ = combineLatest(state$, configManager.dobissCANController$)
+const processor$ = combineLatest(state$, configManager.dobissCANController$, configManager.mqtt$)
     .pipe(
-        switchMap(([ state, canControllerConfig ]) => {
+        switchMap(([ state, canControllerConfig, mqttConfig ]) => {
             // Now we will create observables for every action.
             // In the processor we will concatMap these so that we do one action after the other.
             const actions$ = commands$
@@ -125,16 +124,41 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$)
                     }),
                 );
 
+            const SWITCH_TOPIC = "dobiss/light/set";
+
+            const mqttClient = new RxMqtt(mqttConfig.url);
+
+            const mqttTap = {
+                next(d: any) {
+                    console.log("MQTT", d);
+                },
+                error(e: Error) {
+                    console.error("MQTT", e);
+                },
+                complete() {
+                    console.log("MQTT DONE");
+                },
+            };
+
+            const switches$ = mqttClient.subscribe$(SWITCH_TOPIC)
+                .pipe(
+                    tap(mqttTap)
+                );
+
+            const mqtt$ = switches$;
+
             // We make sure to provice an observable of observables.
             // Every internal observable will complete when the jorb is done.
             // So that the next observable can start.
             // This way it's impossible to do multiple things at once on the socket.
-            return merge(actions$, polls$)
+            const socketOperations$ = merge(actions$, polls$)
                 .pipe(
                     concatMap((obs$) => {
                         return obs$;
                     }),
                 );
+
+            return merge(socketOperations$, mqtt$);
         }),
     );
 
@@ -176,23 +200,5 @@ commands$.next(toggleSalon);
 
 /*
 function testDumbMqttLight() {
-    const SWITCH_TOPIC = "dobiss/light/set";
-
-    const mqttClient = new RxMqtt(config.mqtt.url);
-
-    const switches$ = mqttClient.subscribe$(SWITCH_TOPIC);
-
-    switches$
-        .subscribe({
-            next(d) {
-                console.log("MQTT", d);
-            },
-            error(e) {
-                console.error("MQTT", e);
-            },
-            complete() {
-                console.log("MQTT DONE");
-            },
-        });
 }
 */

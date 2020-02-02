@@ -10,6 +10,7 @@ import {
     merge,
     Observable,
     queueScheduler,
+    Subject,
 } from "rxjs";
 
 import {
@@ -32,13 +33,6 @@ const config = require(process.env.CONFIG_PATH || "../config");
 // TODO: create an API around the config. Could become streamable config.
 
 const debug = DEBUG("dobiss2mqtt.index");
-
-// TODO: This needs to be all up inside the socket API ... .
-function writeBuffersToSocket (socket: Socket, ...buff: Buffer[]) {
-    const buffer = Buffer.concat(buff);
-    socket.write(buffer);
-    debug("done writing");
-}
 
 type Location = { relay: number, output: number };
 
@@ -76,30 +70,26 @@ enum TYPES {
     poll,
 }
 
-type ActionType = {
-    type: TYPES,
+interface IActionType {
+    type: TYPES;
 };
 
-type RelayAction = {
-    type: TYPES.toggle | TYPES.on | TYPES.off,
-    location: string,
+interface IRelayAction extends IActionType {
+    type: TYPES.toggle | TYPES.on | TYPES.off;
+    location: string;
 };
 
-type PollAction = {
-    type: TYPES.poll,
-    location: number,
+interface IPollAction extends IActionType {
+    type: TYPES.poll;
+    location: number;
 };
 
-const toggleSalon = { type: TYPES.toggle, location: "salon" };
-const toggleEetplaats = { type: TYPES.toggle, location: "eetplaats" };
+const toggleSalon: IRelayAction = { type: TYPES.toggle, location: "salon" };
+const toggleEetplaats: IRelayAction = { type: TYPES.toggle, location: "eetplaats" };
 
-const pollFirst = { type: TYPES.poll, location: 0x01 };
+const pollFirst: IPollAction = { type: TYPES.poll, location: 0x01 };
 
-const commands$ = from([
-    toggleSalon,
-    toggleEetplaats,
-    pollFirst,
-]);
+const commands$: Subject<IRelayAction | IPollAction> = new Subject()
 
 // Now we will create observables for every action.
 // In the processor we will concatMap these so that we do one action after the other.
@@ -107,20 +97,20 @@ const actions$ = commands$
     .pipe(
         filter((item) => item.type === TYPES.toggle || item.type === TYPES.on || item.type === TYPES.off),
         map((item) => {
-                const location = getLocation(item.location as string);
+            const location = getLocation(item.location as string);
 
-                if (!location) {
-                    return empty();
-                }
+            if (!location) {
+                return empty();
+            }
 
-                const buffer = createRelayAction(location.relay, location.output, 0x02);
+            const buffer = createRelayAction(location.relay, location.output, 0x02);
 
-                if (!buffer) {
-                    return empty();
-                }
+            if (!buffer) {
+                return empty();
+            }
 
-                return socketClient
-                    .send(buffer);
+            return socketClient
+                .send(buffer);
         }),
     );
 
@@ -128,20 +118,16 @@ const polls$ = commands$
     .pipe(
         filter((item) => item.type === TYPES.poll),
         map((item) => {
-            if (item.type === TYPES.poll) {
-                const response$ = socketClient
-                    .send(createPingForState({ relais: item.location as number }));
+            const response$ = socketClient
+                .send(createPingForState({ relais: item.location as number }));
 
-                return response$
-                    .pipe(
-                        map((response) => {
-                            console.log({ response });
-                            return true;
-                        }),
-                    );
-            }
-
-            return empty();
+            return response$
+                .pipe(
+                    map((response) => {
+                        console.log({ response });
+                        return true;
+                    }),
+                );
         }),
     );
 
@@ -170,3 +156,7 @@ processor$
             console.log("I'm out.");
         },
     });
+
+//commands$.next(toggleSalon);
+//commands$.next(toggleEetplaats);
+commands$.next(pollFirst);

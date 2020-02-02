@@ -7,7 +7,7 @@ module.exports = {
     mqtt: {
         url: '10.0.0.2'
     },
-    exits: [
+    relays: [
         [
             "berging", // 1.1
             "koele_berging", // 1.2

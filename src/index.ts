@@ -1,65 +1,28 @@
 import DEBUG from "debug";
-import { Socket } from "net";
-import { createPingForState, createRelayAction } from "./dobiss";
-import { convertBufferToByteArray } from "./helpers";
+
+import DobissState, {
+    createPingForState,
+    createRelayAction,
+} from "./dobiss";
+
 import SocketClient from "./rx-socket";
 
 import {
     empty,
-    from,
     merge,
-    Observable,
-    queueScheduler,
     Subject,
 } from "rxjs";
 
 import {
     concatMap,
-    delay,
     filter,
     map,
-    multicast,
-    observeOn,
-    shareReplay,
-    switchMap,
-    switchMapTo,
-    take,
-    tap,
 } from "rxjs/operators";
-
-import { types } from "util";
 
 const config = require(process.env.CONFIG_PATH || "../config");
 // TODO: create an API around the config. Could become streamable config.
 
 const debug = DEBUG("dobiss2mqtt.index");
-
-type Location = { relay: number, output: number };
-
-function getLocation (name: string): Location | null {
-    let relay;
-    let output;
-    let found;
-
-    for (relay = 1; relay < config.exits.length + 1; relay++) {
-        for (output = 0; relay < config.exits[relay - 1].length; output++) {
-            if (config.exits[relay - 1][output] === name) {
-                found = true;
-                break;
-            }
-        }
-
-        if (found) {
-            break;
-        }
-    }
-
-    if (!found) {
-        return null;
-    }
-
-    return { relay, output } as Location;
-}
 
 const socketClient = new SocketClient({ host: config.dobiss.host, port: config.dobiss.port });
 
@@ -89,7 +52,9 @@ const toggleEetplaats: IRelayAction = { type: TYPES.toggle, location: "eetplaats
 
 const pollFirst: IPollAction = { type: TYPES.poll, location: 0x01 };
 
-const commands$: Subject<IRelayAction | IPollAction> = new Subject()
+const commands$: Subject<IRelayAction | IPollAction> = new Subject();
+
+const state = new DobissState(config.relays)
 
 // Now we will create observables for every action.
 // In the processor we will concatMap these so that we do one action after the other.
@@ -97,7 +62,7 @@ const actions$ = commands$
     .pipe(
         filter((item) => item.type === TYPES.toggle || item.type === TYPES.on || item.type === TYPES.off),
         map((item) => {
-            const location = getLocation(item.location as string);
+            const location = state.getLocation(item.location as string);
 
             if (!location) {
                 return empty();
@@ -157,6 +122,12 @@ processor$
         },
     });
 
-//commands$.next(toggleSalon);
-//commands$.next(toggleEetplaats);
+// TODO: Create a service which will be based off of the config.
+//       It will expose an initial state for every configured light.
+//       If we push it states for a specific relais it will update the internal states of the lights.
+//       This big service will emit the full state of the light whenever it has changed.
+//       Everything needed to construct a message on mqtt to indicate the state of the light.
+// TODO: Create something which, given the config, will expose a set of lights.
+// commands$.next(toggleSalon);
+// commands$.next(toggleEetplaats);
 commands$.next(pollFirst);

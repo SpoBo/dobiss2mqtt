@@ -1,4 +1,12 @@
 // TODO: To be refactored. THis is just a test file to figure out the protocol.
+import {
+    Observable, empty,
+} from "rxjs";
+
+interface ILightState {
+    name: string,
+    powered: boolean,
+}
 
 const HEADER_DEFAULTS = {
     colDataCount: 8,
@@ -80,4 +88,53 @@ export function createPingForState ({ relais }: { relais: number }) {
         type: 8, // don't know what 8 is ... .
     });
 
+}
+
+type Location = { relay: number, output: number };
+
+interface IRelayConfig {
+    [index: number]: ISingleRelayConfig,
+    length: number,
+}
+
+interface ISingleRelayConfig {
+    [index: number]: string,
+    length: number,
+}
+
+export default class DobissState {
+    private config: IRelayConfig;
+
+    constructor(config: any) {
+        this.config = config;
+    }
+
+    public get lights$(): Observable<ILightState> {
+        return empty();
+    }
+
+    public getLocation(name: string): Location | null {
+        let relay;
+        let output;
+        let found;
+
+        for (relay = 1; relay < this.config.length + 1; relay++) {
+            for (output = 0; relay < this.config[relay - 1].length; output++) {
+                if (this.config[relay - 1][output] === name) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found) {
+                break;
+            }
+        }
+
+        if (!found) {
+            return null;
+        }
+
+        return { relay, output } as Location;
+    }
 }

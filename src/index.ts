@@ -1,23 +1,29 @@
 import DEBUG from "debug";
+import { Socket } from "net";
 import { createPingForState, createRelayAction } from "./dobiss";
 import { convertBufferToByteArray } from "./helpers";
 import SocketClient from "./rx-socket";
-import { Socket } from "net";
-import { from, empty, queueScheduler } from "rxjs";
 
 import {
-    multicast,
+    empty,
+    from,
+    merge,
+    Observable,
+    queueScheduler,
+} from "rxjs";
+
+import {
+    concatMap,
+    delay,
+    filter,
     map,
+    multicast,
+    observeOn,
+    shareReplay,
     switchMap,
     switchMapTo,
-    shareReplay,
     take,
     tap,
-    observeOn,
-    delay,
-    concatMap,
-    filter,
-    merge
 } from "rxjs/operators";
 
 import { types } from "util";
@@ -61,58 +67,81 @@ function getLocation (name: string): Location | null {
     return { relay, output } as Location;
 }
 
-/*
-socket.on("connect", () => {
-    debug("connected");
+const socketClient = new SocketClient({ host: config.dobiss.host, port: config.dobiss.port });
 
-    writeBuffersToSocket(createPingForState({ relais: 0x01 }));
-    writeBuffersToSocket(createPingForState({ relais: 0x02 }));
-
-    const location = getLocation("salon");
-
-    console.log({ location });
-
-    if (location) {
-        writeBuffersToSocket(createRelayAction(location.relay, location.output, 0x02));
-    }
-});
-*/
-
-const socketClient = new SocketClient({ host: config.dobiss.host, port: config.dobiss.port })
-
-const TYPES = {
-    toggle: Symbol('toggle'),
-    poll: Symbol('poll'),
+enum TYPES {
+    toggle,
+    on,
+    off,
+    poll,
 }
 
-const toggleSalon = { action: TYPES.toggle, location: "salon" };
-const toggleEetplaats = { action: TYPES.toggle, location: "eetplaats" };
+type ActionType = {
+    type: TYPES,
+};
+
+type RelayAction = {
+    type: TYPES.toggle | TYPES.on | TYPES.off,
+    location: string,
+};
+
+type PollAction = {
+    type: TYPES.poll,
+    location: number,
+};
+
+const toggleSalon = { type: TYPES.toggle, location: "salon" };
+const toggleEetplaats = { type: TYPES.toggle, location: "eetplaats" };
+
+const pollFirst = { type: TYPES.poll, location: 0x01 };
 
 const commands$ = from([
     toggleSalon,
     toggleEetplaats,
+    pollFirst,
 ]);
 
 // Now we will create observables for every action.
 // In the processor we will concatMap these so that we do one action after the other.
 const actions$ = commands$
     .pipe(
-        filter((item) => item.action === TYPES.toggle),
+        filter((item) => item.type === TYPES.toggle || item.type === TYPES.on || item.type === TYPES.off),
         map((item) => {
-            const location = getLocation(item.location);
+                const location = getLocation(item.location as string);
 
-            if (!location) {
-                return empty();
+                if (!location) {
+                    return empty();
+                }
+
+                const buffer = createRelayAction(location.relay, location.output, 0x02);
+
+                if (!buffer) {
+                    return empty();
+                }
+
+                return socketClient
+                    .send(buffer);
+        }),
+    );
+
+const polls$ = commands$
+    .pipe(
+        filter((item) => item.type === TYPES.poll),
+        map((item) => {
+            if (item.type === TYPES.poll) {
+                const response$ = socketClient
+                    .send(createPingForState({ relais: item.location as number }));
+
+                return response$
+                    .pipe(
+                        map((response) => {
+                            console.log({ response });
+                            return true;
+                        }),
+                    );
             }
 
-            const buffer = createRelayAction(location.relay, location.output, 0x02)
-
-            if (!buffer) {
-                return empty();
-            }
-
-            return socketClient
-                .send(buffer);
+            return empty();
         }),
     );
 
@@ -120,7 +149,9 @@ const actions$ = commands$
 // Every internal observable will complete when the jorb is done.
 // So that the next observable can start.
 // This way it's impossible to do multiple things at once on the socket.
-const processor$ = actions$
+const stuff$ = merge(actions$, polls$);
+
+const processor$ = stuff$
     .pipe(
         concatMap((obs$) => {
             return obs$;
@@ -133,9 +164,9 @@ processor$
             console.log("out", out);
         },
         error(e) {
-            console.error('BAM', e)
+            console.error("BAM", e);
         },
         complete() {
-            console.log("I'm out.")
-        }
+            console.log("I'm out.");
+        },
     });

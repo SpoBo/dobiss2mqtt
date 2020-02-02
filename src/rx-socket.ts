@@ -1,8 +1,8 @@
-import { convertBufferToByteArray } from "./helpers";
 import DEBUG from "debug";
-import { shareReplay, switchMap, take, tap } from "rxjs/operators";
-import { fromEvent, Observable } from "rxjs";
 import { Socket, SocketConnectOpts } from "net";
+import { fromEvent, Observable } from "rxjs";
+import { shareReplay, switchMap, take, tap } from "rxjs/operators";
+import { convertBufferToByteArray } from "./helpers";
 
 const debug = DEBUG("dobiss2mqtt.socket");
 

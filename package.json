@@ -5,7 +5,9 @@
     "author": "Vincent De Snerck <vincent@xps-supervillain>",
     "license": "MIT",
     "main": "app/main.js",
-    "scripts": {},
+    "scripts": {
+        "lint": "tslint src/*"
+    },
     "volta": {
         "node": "13.7.0"
     },

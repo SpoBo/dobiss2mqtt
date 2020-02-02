@@ -1,42 +1,47 @@
 import { convertBufferToByteArray } from "./helpers";
 import DEBUG from "debug";
-import { Observable, queueScheduler } from "rxjs";
-import { observeOn } from "rxjs/operators";
+import { shareReplay, switchMap, take, tap } from "rxjs/operators";
+import { fromEvent, Observable } from "rxjs";
 import { Socket, SocketConnectOpts } from "net";
 
 const debug = DEBUG("dobiss2mqtt.socket");
 
-export class SocketClient {
-    private socket: Socket;
+export default class SocketClient {
+    private socket$: Observable<Socket>;
 
-    constructor(socket: Socket) {
-        this.socket = socket;
+    constructor(opts: SocketConnectOpts) {
+        this.socket$ = socket(opts);
     }
 
     public send(input: Buffer): Observable<Buffer> {
-        return new Observable(
-            (subscriber) => {
-                debug("writing hex %o, ascii: %o", input.toString("hex"), convertBufferToByteArray(input));
-                this.socket.write(input);
-
-                this.socket.once("data", (output) => {
-                    const byteArray = convertBufferToByteArray(output);
-                    debug("received hex %o, ascii %o", output.toString("hex"), byteArray);
-
-                    subscriber.next(output);
-                    subscriber.complete();
-                });
-            })
+        // TODO: build some kind of queue so that when we hit this mutliple times in a
+        // row ... it schedules the next request to happen after the previous one has
+        // completed.
+        return this.socket$
             .pipe(
-                (v) => observeOn(queueScheduler)(v) as Observable<Buffer>,
+                switchMap((socket) => {
+                    debug("writing hex %o, ascii: %o", input.toString("hex"), convertBufferToByteArray(input));
+
+                    const done$ = (fromEvent(socket, "data") as Observable<Buffer>)
+                        .pipe(
+                            take(1),
+                            tap({
+                                next(output: Buffer) {
+                                    const byteArray = convertBufferToByteArray(output);
+                                    debug("received hex %o, ascii %o", output.toString("hex"), byteArray);
+                                },
+                            }),
+                        );
+
+                    socket.write(input);
+                    return done$;
+                }),
+                take(1),
             );
     }
 }
 
-// TODO: Expose a cleaner API from the socket.
-//       I'd like to just do a write / response mechanism ... .
-//       With an internal queue.
-export default function socket (opts: SocketConnectOpts): Observable<SocketClient> {
+function socket (opts: SocketConnectOpts): Observable<Socket> {
     return new Observable((subscriber) => {
         debug("going to connect");
 
@@ -75,12 +80,18 @@ export default function socket (opts: SocketConnectOpts): Observable<SocketClien
         });
 
         client.on("connect", () => {
-            subscriber.next(new SocketClient(client));
+            subscriber.next(client);
         });
 
         return () => {
             debug("request for socket termination");
             client.end();
         };
-    });
+    })
+    .pipe(
+        // This hacky stuff is needed because of TypeScript.
+        // Can this be fixed ?
+        // In any case shareReplay is needed otherwise we thrash the socket after our first connection.
+        (v) => shareReplay(1)(v) as Observable<Socket>,
+    );
 }

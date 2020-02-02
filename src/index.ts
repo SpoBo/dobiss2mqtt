@@ -1,10 +1,26 @@
 import DEBUG from "debug";
 import { createPingForState, createRelayAction } from "./dobiss";
 import { convertBufferToByteArray } from "./helpers";
-import socket, { SocketClient } from "./rx-socket";
+import SocketClient from "./rx-socket";
 import { Socket } from "net";
-import { ReplaySubject, from, empty, queueScheduler } from "rxjs";
-import { refCount, multicast, map, switchMap, switchMapTo, shareReplay, take, tap, observeOn, delay, mergeMap, concatMap } from "rxjs/operators";
+import { from, empty, queueScheduler } from "rxjs";
+
+import {
+    multicast,
+    map,
+    switchMap,
+    switchMapTo,
+    shareReplay,
+    take,
+    tap,
+    observeOn,
+    delay,
+    concatMap,
+    filter,
+    merge
+} from "rxjs/operators";
+
+import { types } from "util";
 
 const config = require(process.env.CONFIG_PATH || "../config");
 // TODO: create an API around the config. Could become streamable config.
@@ -62,67 +78,64 @@ socket.on("connect", () => {
 });
 */
 
-const socket$ = socket({ host: config.dobiss.host, port: config.dobiss.port })
-    .pipe(shareReplay(1));
+const socketClient = new SocketClient({ host: config.dobiss.host, port: config.dobiss.port })
 
-const toggleSalon = { action: "toggle", location: "salon" };
-const toggleEetplaats = { action: "toggle", location: "eetplaats" };
+const TYPES = {
+    toggle: Symbol('toggle'),
+    poll: Symbol('poll'),
+}
+
+const toggleSalon = { action: TYPES.toggle, location: "salon" };
+const toggleEetplaats = { action: TYPES.toggle, location: "eetplaats" };
 
 const commands$ = from([
     toggleSalon,
     toggleEetplaats,
 ]);
 
-const processor$ = commands$
-    // TODO: split up in actions and polls.
+// Now we will create observables for every action.
+// In the processor we will concatMap these so that we do one action after the other.
+const actions$ = commands$
     .pipe(
+        filter((item) => item.action === TYPES.toggle),
         map((item) => {
-            return getLocation(item.location);
-        }),
-        tap({
-            next(d) {
-                console.log('d', d)
-            }
-        }),
-        concatMap((location) => {
+            const location = getLocation(item.location);
+
             if (!location) {
                 return empty();
             }
 
-            return socket$
-                .pipe(
-                    switchMap((client: SocketClient) => {
-                        const buffer = createRelayAction(location.relay, location.output, 0x02)
+            const buffer = createRelayAction(location.relay, location.output, 0x02)
 
-                        if (buffer) {
-                            return client
-                              .send(buffer);
-                        }
+            if (!buffer) {
+                return empty();
+            }
 
-                        return empty();
-                    }),
-                    // need to take 1 here since we don't want the socket to hang until someone else uses it
-                    // maybe rebuild the API so that this is not needed ... .
-                    take(1),
-                    tap({
-                        complete() {
-                            console.log("OK!")
-                        }
-                    })
-                );
-        })
+            return socketClient
+                .send(buffer);
+        }),
     );
 
-const client = processor$
+// We make sure to provice an observable of observables.
+// Every internal observable will complete when the jorb is done.
+// So that the next observable can start.
+// This way it's impossible to do multiple things at once on the socket.
+const processor$ = actions$
+    .pipe(
+        concatMap((obs$) => {
+            return obs$;
+        }),
+    );
+
+processor$
     .subscribe({
         next: (out: any) => {
             console.log("out", out);
         },
+        error(e) {
+            console.error('BAM', e)
+        },
+        complete() {
+            console.log("I'm out.")
+        }
     });
-
-/*
-setTimeout(() => {
-    client.unsubscribe();
-}, 1000);
-
-*/

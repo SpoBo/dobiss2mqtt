@@ -1,11 +1,11 @@
-// TODO: To be refactored. THis is just a test file to figure out the protocol.
 import {
-    Observable, empty,
+    empty,
+    Observable,
 } from "rxjs";
 
 interface ILightState {
-    name: string,
-    powered: boolean,
+    name: string;
+    powered: boolean;
 }
 
 const HEADER_DEFAULTS = {
@@ -93,13 +93,13 @@ export function createPingForState ({ relais }: { relais: number }) {
 type Location = { relay: number, output: number };
 
 interface IRelayConfig {
-    [index: number]: ISingleRelayConfig,
-    length: number,
+    [index: number]: ISingleRelayConfig;
+    length: number;
 }
 
 interface ISingleRelayConfig {
-    [index: number]: string,
-    length: number,
+    [index: number]: string;
+    length: number;
 }
 
 export default class DobissState {
@@ -112,6 +112,8 @@ export default class DobissState {
     public get lights$(): Observable<ILightState> {
         return empty();
     }
+
+    // TODO: maybe output an observable which will start pinging the configured relays at a set interval.
 
     public getLocation(name: string): Location | null {
         let relay;
@@ -137,4 +139,5 @@ export default class DobissState {
 
         return { relay, output } as Location;
     }
+
 }

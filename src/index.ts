@@ -1,6 +1,7 @@
 import DEBUG from "debug";
 
-import DobissState, {
+import DobissState,
+{
     createPingForState,
     createRelayAction,
 } from "./dobiss";
@@ -18,11 +19,14 @@ import {
     filter,
     map,
 } from "rxjs/operators";
+import { RxMqtt } from "./rx-mqtt";
 
-const config = require(process.env.CONFIG_PATH || "../config");
 // TODO: create an API around the config. Could become streamable config.
+const config = require(process.env.CONFIG_PATH || "../config");
 
 const debug = DEBUG("dobiss2mqtt.index");
+
+const state = new DobissState(config.relays);
 
 const socketClient = new SocketClient({ host: config.dobiss.host, port: config.dobiss.port });
 
@@ -47,14 +51,7 @@ interface IPollAction extends IActionType {
     location: number;
 };
 
-const toggleSalon: IRelayAction = { type: TYPES.toggle, location: "salon" };
-const toggleEetplaats: IRelayAction = { type: TYPES.toggle, location: "eetplaats" };
-
-const pollFirst: IPollAction = { type: TYPES.poll, location: 0x01 };
-
 const commands$: Subject<IRelayAction | IPollAction> = new Subject();
-
-const state = new DobissState(config.relays)
 
 // Now we will create observables for every action.
 // In the processor we will concatMap these so that we do one action after the other.
@@ -75,7 +72,15 @@ const actions$ = commands$
             }
 
             return socketClient
-                .send(buffer);
+                .send(buffer)
+                .pipe(
+                    map((output) => {
+                        return {
+                            input: item,
+                            output,
+                        };
+                    }),
+                );
         }),
     );
 
@@ -88,9 +93,11 @@ const polls$ = commands$
 
             return response$
                 .pipe(
-                    map((response) => {
-                        console.log({ response });
-                        return true;
+                    map((output) => {
+                        return {
+                            input: item,
+                            output,
+                        };
                     }),
                 );
         }),
@@ -100,9 +107,7 @@ const polls$ = commands$
 // Every internal observable will complete when the jorb is done.
 // So that the next observable can start.
 // This way it's impossible to do multiple things at once on the socket.
-const stuff$ = merge(actions$, polls$);
-
-const processor$ = stuff$
+const processor$ = merge(actions$, polls$)
     .pipe(
         concatMap((obs$) => {
             return obs$;
@@ -112,15 +117,21 @@ const processor$ = stuff$
 processor$
     .subscribe({
         next: (out: any) => {
-            console.log("out", out);
+            debug("processed %o", out);
         },
         error(e) {
-            console.error("BAM", e);
+            debug("ERROR %o", e);
         },
         complete() {
-            console.log("I'm out.");
+            debug("completed processor");
         },
     });
+
+const toggleSalon: IRelayAction = { type: TYPES.toggle, location: "salon" };
+const toggleEetplaats: IRelayAction = { type: TYPES.toggle, location: "eetplaats" };
+
+const pollFirst: IPollAction = { type: TYPES.poll, location: 0x01 };
+const pollSecond: IPollAction = { type: TYPES.poll, location: 0x02 };
 
 // TODO: Create a service which will be based off of the config.
 //       It will expose an initial state for every configured light.
@@ -131,3 +142,29 @@ processor$
 // commands$.next(toggleSalon);
 // commands$.next(toggleEetplaats);
 commands$.next(pollFirst);
+
+// MQTT
+//
+// send "ON" or "OFF" on each 'light state topic'.
+// so we need to generate a topic per light.
+// listens on a light switch topic. / command topic.
+// where we will receive "ON" or "OFF".
+
+const SWITCH_TOPIC = "dobiss/light/set";
+
+const mqttClient = new RxMqtt(config.mqtt.url);
+
+const switches$ = mqttClient.subscribe$(SWITCH_TOPIC);
+
+switches$
+    .subscribe({
+        next(d) {
+            console.log("MQTT", d);
+        },
+        error(e) {
+            console.error("MQTT", e);
+        },
+        complete() {
+            console.log("MQTT DONE");
+        },
+    });

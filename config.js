@@ -5,7 +5,7 @@ module.exports = {
         port: 10001
     },
     mqtt: {
-        url: '10.0.0.2'
+        url: 'mqtt://10.0.0.2'
     },
     relays: [
         [

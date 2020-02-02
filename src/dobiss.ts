@@ -2,6 +2,7 @@ import {
     empty,
     Observable,
 } from "rxjs";
+import { IRelayConfig } from "./config";
 
 interface ILightState {
     name: string;
@@ -87,25 +88,14 @@ export function createPingForState ({ relais }: { relais: number }) {
         relais,
         type: 8, // don't know what 8 is ... .
     });
-
 }
 
 type Location = { relay: number, output: number };
 
-interface IRelayConfig {
-    [index: number]: ISingleRelayConfig;
-    length: number;
-}
-
-interface ISingleRelayConfig {
-    [index: number]: string;
-    length: number;
-}
-
 export default class DobissState {
-    private config: IRelayConfig;
+    private config: IRelayConfig[];
 
-    constructor(config: any) {
+    constructor(config: IRelayConfig[]) {
         this.config = config;
     }
 
@@ -116,28 +106,16 @@ export default class DobissState {
     // TODO: maybe output an observable which will start pinging the configured relays at a set interval.
 
     public getLocation(name: string): Location | null {
-        let relay;
-        let output;
-        let found;
-
-        for (relay = 1; relay < this.config.length + 1; relay++) {
-            for (output = 0; relay < this.config[relay - 1].length; output++) {
-                if (this.config[relay - 1][output] === name) {
-                    found = true;
-                    break;
-                }
-            }
-
-            if (found) {
-                break;
-            }
-        }
+        const found = this.config
+            .find(({ id }) => name === id);
 
         if (!found) {
             return null;
         }
 
-        return { relay, output } as Location;
+        return {
+            relay: found.relay,
+            output: found.output,
+        } as Location;
     }
-
 }

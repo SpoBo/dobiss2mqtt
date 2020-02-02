@@ -5,6 +5,7 @@ module.exports = {
         port: 10001
     },
     mqtt: {
+        // TODO: Will need to properly map all params for mqtt.
         url: 'mqtt://10.0.0.2'
     },
     relays: [

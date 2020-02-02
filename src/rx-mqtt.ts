@@ -7,6 +7,11 @@ import { filter, map, shareReplay, switchMap, tap } from "rxjs/operators";
 
 const debug = DEBUG("dobiss2mqtt.mqtt");
 
+interface ISimplifiedMqttClient {
+    message$: Observable<[ string, Buffer, IPubrecPacket ]>;
+    subscribe$: ({ topic }: { topic: string }) => Observable<any>;
+}
+
 export class RxMqtt {
     private client$: Observable<ISimplifiedMqttClient>;
 
@@ -28,20 +33,13 @@ export class RxMqtt {
                                     debug("message response for %s is %o", topic, d);
                                 },
                             }),
-                            map(([ topic, buffer ]) => buffer.toString()),
+                            map(([ _, buffer ]) => buffer.toString()),
                         );
 
                     return concat(subscribe$, replies$);
                 }),
             );
     }
-}
-
-// try and share a single mqtt client.
-
-interface ISimplifiedMqttClient {
-    message$: Observable<[ string, Buffer, IPubrecPacket ]>;
-    subscribe$: ({ topic }: { topic: string }) => Observable<any>;
 }
 
 function client (url: string): Observable<ISimplifiedMqttClient> {
@@ -70,6 +68,7 @@ function client (url: string): Observable<ISimplifiedMqttClient> {
                         });
                     });
                 },
+                // TODO: Maybe add an unsubscribe ?
             });
         });
 

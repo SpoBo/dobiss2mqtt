@@ -4,10 +4,15 @@ import { map } from "rxjs/operators";
 type AllRelaysConfig = SingleRelayConfig[];
 type SingleRelayConfig = string[];
 
-export interface IRelayConfig {
+export interface IRelayOutputConfig {
     relay: number;
     output: number;
-    id: string;
+    name: string;
+}
+
+export interface IRelayConfig {
+    id: number;
+    outputs: IRelayOutputConfig[];
 }
 
 export interface IDobissConfig {
@@ -32,7 +37,7 @@ export default class ConfigManager {
     }
 
     // map the internal config to a bigger & better format.
-    public get relays$(): Observable<IRelayConfig[]> {
+    public get outputs$(): Observable<IRelayOutputConfig[]> {
         return this.config$
             .pipe(
                 map(({ relays }) => relays as AllRelaysConfig),
@@ -40,15 +45,45 @@ export default class ConfigManager {
                     return relays
                         .reduce((acc, relay, relayIndex) => {
                             return relay
-                                .reduce((acc, id, relayItemIndex) => {
-                                    acc.push({
+                                .reduce((innerAcc, name, relayItemIndex) => {
+                                    innerAcc.push({
                                         output: relayItemIndex,
                                         relay: relayIndex + 1,
-                                        id,
+                                        name,
                                     });
 
-                                    return acc;
+                                    return innerAcc;
                                 }, acc);
+                        }, [] as IRelayOutputConfig[]);
+                }),
+            );
+    }
+
+    public get relays$(): Observable<IRelayConfig[]> {
+        return this
+            .outputs$
+            .pipe(
+                map((outputs) => {
+                    // We will receive a list of outputs across all relays.
+                    // We will group them per relay.
+                    // Per relay we will have an interval to ask for the state of every output on the relay.
+                    return outputs
+                        .reduce((relays, output) => {
+                            const relayIndex = output.relay - 1;
+                            let relay = relays[relayIndex];
+
+                            if (!relay) {
+                                relay = {
+                                    id: output.output,
+                                    outputs: [],
+                                };
+
+                                relays.push(relay);
+                            }
+
+                            relay.outputs.push(output);
+
+                            return relays;
                         }, [] as IRelayConfig[]);
                 }),
             );

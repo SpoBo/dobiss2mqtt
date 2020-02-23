@@ -2,7 +2,7 @@ import {
     empty,
     Observable,
 } from "rxjs";
-import { IRelayConfig } from "./config";
+import { IRelayOutputConfig } from "./config";
 
 interface ILightState {
     name: string;
@@ -93,9 +93,9 @@ export function createPingForState ({ relais }: { relais: number }) {
 type Location = { relay: number, output: number };
 
 export default class DobissState {
-    private config: IRelayConfig[];
+    private config: IRelayOutputConfig[];
 
-    constructor(config: IRelayConfig[]) {
+    constructor(config: IRelayOutputConfig[]) {
         this.config = config;
     }
 
@@ -107,15 +107,15 @@ export default class DobissState {
 
     public getLocation(name: string): Location | null {
         const found = this.config
-            .find(({ id }) => name === id);
+            .find(({ name }) => name === name);
 
         if (!found) {
             return null;
         }
 
         return {
-            relay: found.relay,
             output: found.output,
+            relay: found.relay,
         } as Location;
     }
 }

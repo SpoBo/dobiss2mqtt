@@ -1,6 +1,6 @@
 import DEBUG from "debug";
 
-import mqtt, { IPubrecPacket, MqttClient } from "mqtt";
+import { connect, IPubrecPacket, MqttClient } from "mqtt";
 
 import { concat, fromEvent, Observable } from "rxjs";
 import { filter, map, shareReplay, switchMap, tap } from "rxjs/operators";
@@ -10,6 +10,7 @@ const debug = DEBUG("dobiss2mqtt.mqtt");
 interface ISimplifiedMqttClient {
     message$: Observable<[ string, Buffer, IPubrecPacket ]>;
     subscribe$: ({ topic }: { topic: string }) => Observable<any>;
+    publish: ({ topic, payload } : { topic: string, payload: string | Buffer }) => Observable<any>;
 }
 
 export class RxMqtt {
@@ -40,13 +41,26 @@ export class RxMqtt {
                 }),
             );
     }
+
+    public publish$(topic: string, payload: string | Buffer | object) {
+        return this.client$
+            .pipe(
+                switchMap((d) => {
+                    if (typeof payload === "object") {
+                        payload = JSON.stringify(payload);
+                    }
+
+                    return d.publish({ topic, payload });
+                }),
+            );
+    }
 }
 
 function client (url: string): Observable<ISimplifiedMqttClient> {
     return new Observable((subscriber) => {
         debug("going to connect");
 
-        const client = mqtt.connect(url);
+        const client = connect(url);
 
         client.on("close", () => {
             debug("close");
@@ -60,6 +74,17 @@ function client (url: string): Observable<ISimplifiedMqttClient> {
                 subscribe$: ({ topic }: { topic: string }) => {
                     return new Observable((subscriber) => {
                         client.subscribe(topic, (err) => {
+                            if (err) {
+                                subscriber.error(err);
+                            }
+
+                            subscriber.complete();
+                        });
+                    });
+                },
+                publish: ({ topic, payload }: { topic: string, payload: string | Buffer }) => {
+                    return new Observable((subscriber) => {
+                        client.publish(topic, payload, (err) => {
                             if (err) {
                                 subscriber.error(err);
                             }
@@ -89,6 +114,7 @@ function client (url: string): Observable<ISimplifiedMqttClient> {
         });
 
         client.on("end", () => {
+            subscriber.complete();
             debug("end");
         });
 

@@ -11,8 +11,10 @@ import SocketClient from "./rx-socket";
 import {
     combineLatest,
     empty,
+    interval,
     merge,
     Subject,
+    timer,
 } from "rxjs";
 
 import {
@@ -25,7 +27,7 @@ import {
 
 import { RxMqtt } from "./rx-mqtt";
 
-import ConfigManager, { IRelayConfig, IRelayOutputConfig } from "./config";
+import ConfigManager, { IRelayOutputConfig } from "./config";
 
 interface IMQTTLightConfig {
     name: string;
@@ -39,14 +41,6 @@ interface IMQTTLightConfig {
     };
 }
 
-interface IRelayOutputConfigWithMQTT extends IRelayOutputConfig {
-    config: IMQTTLightConfig;
-}
-
-interface IRelayConfigWithMQTT extends IRelayConfig {
-    outputs: IRelayOutputConfigWithMQTT[];
-}
-
 enum TYPES {
     toggle,
     on,
@@ -54,27 +48,11 @@ enum TYPES {
     poll,
 }
 
-interface IActionType {
-    type: TYPES;
-};
-
-interface IRelayAction extends IActionType {
-    type: TYPES.toggle | TYPES.on | TYPES.off;
-    location: string;
-};
-
-interface IPollAction extends IActionType {
-    type: TYPES.poll;
-    location: number;
-};
-
 const debug = DEBUG("dobiss2mqtt.index");
 
 // This preps the config and moves it into several observables.
 // As soon as the config changes and it impacts this part of the config it will emit a new value.
 const configManager = new ConfigManager(process.env.CONFIG_PATH || "../config");
-
-const commands$: Subject<IRelayAction | IPollAction> = new Subject();
 
 const state$ = configManager
     .outputs$
@@ -100,57 +78,6 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
 
             // Create the MQTT client which will also kick into gear when we need it.
             const mqttClient = new RxMqtt(mqttConfig.url);
-
-            // Now we will create observables for every type of command.
-            const actions$ = commands$
-                .pipe(
-                    filter((item) => item.type === TYPES.toggle || item.type === TYPES.on || item.type === TYPES.off),
-                    map((item) => {
-                        // Grab the location to perform the actions on.
-                        const location = state.getLocation(item.location as string);
-
-                        if (!location) {
-                            return empty();
-                        }
-
-                        const buffer = createRelayAction(location.relay, location.output, item.type);
-
-                        if (!buffer) {
-                            return empty();
-                        }
-
-                        return socketClient
-                            .send(buffer)
-                            .pipe(
-                                map((output) => {
-                                    return {
-                                        input: item,
-                                        output,
-                                    };
-                                }),
-                            );
-                    }),
-                );
-
-            // Polls are requests we emit to ask the state of the relays.
-            const polls$ = commands$
-                .pipe(
-                    filter((item) => item.type === TYPES.poll),
-                    map((item) => {
-                        const response$ = socketClient
-                            .send(createPingForState({ relais: item.location as number }));
-
-                        return response$
-                            .pipe(
-                                map((output) => {
-                                    return {
-                                        input: item,
-                                        output,
-                                    };
-                                }),
-                            );
-                    }),
-                );
 
             const relaysWithMQTTConfig$ = configManager
                 .relays$
@@ -197,9 +124,7 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                         // Discovery, listening to MQTT, emitting states on statechange, etc.
                         const observables = relays
                             .map((relay) => {
-                                // We want an observable to manage the full relay.
-                                // And we will merge these puppies.
-                                // TODO: This will be an observable which will emit an item whenever it notices an output changed state.
+                                // This will listen to state change requests and emit a command relevant to the state request.
                                 const actionRequests$ = merge(
                                     ...relay.outputs
                                         .map((output) => {
@@ -209,14 +134,64 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                                     map((request) => {
                                                         return { request: JSON.parse(request), output };
                                                     }),
-                                                    tap({
-                                                        next: ({ request, output }) => {
-                                                            commands$.next({ type: request.state === 'ON' ? TYPES.on : TYPES.off, location: output.name });
-                                                        },
+                                                    switchMap(({ request, output }) => {
+                                                        const type = request.state === "ON" ? TYPES.on : TYPES.off;
+
+                                                        // Grab the location to perform the actions on.
+                                                        const location = { output: output.output, relay: output.relay };
+
+                                                        if (!location) {
+                                                            return empty();
+                                                        }
+
+                                                        const buffer = createRelayAction(location.relay, location.output, type);
+
+                                                        if (!buffer) {
+                                                            return empty();
+                                                        }
+
+                                                        // TODO: We can try to emit a new state poll request for this relay when we know the state change was processed.
+                                                        //       For this I think we will need to rejigger how we emit commands.
+                                                        return socketClient
+                                                            .send(buffer)
+                                                            .pipe(
+                                                                map((response) => {
+                                                                    return {
+                                                                        request,
+                                                                        response,
+                                                                        output,
+                                                                    };
+                                                                }),
+                                                            );
                                                     }),
                                                 );
                                         }),
                                 );
+
+                                // const requestState = new Subject()
+
+                                // TODO: Periodically ping the state and keep a rolling state for every output. Only when a change of the state is detected will we emit the new state.
+                                // TODO: Automatically ping the state after an action request.
+                                const periodicallyRequest$ = interval(5000)
+                                    .pipe(
+                                        tap({
+                                            next(v) {
+                                                console.log("INTERVAL", v);
+                                            },
+                                        }),
+                                    );
+
+                                const polls$ = merge(periodicallyRequest$);
+                                /*
+                                  const response$ = socketClient
+                                      .send(createPingForState({ relais: item.location as number }));
+                                */
+
+                                // TODO: We need a pipe where we emit events for every output.
+                                //       The events will contain the config per output as well as the latest state.
+                                //       We will then groupBy per unique_id
+                                //       When we detect a change of state per unique_id (or the initial state) we will emit a message on MQTT indicating the new state for this specific output.
+                                const outputStates$ = empty();
 
                                 // Send discovery info for all the configured devices.
                                 // So this will be an array of observables which will each emit the config for every output.
@@ -224,6 +199,7 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                     ...relay
                                         .outputs
                                         .map((output) => {
+                                            // TODO: Do we do this on an interval ? Do we do this after a specific mqtt request ?
                                             return mqttClient
                                                 .publish$(
                                                     `homeassistant/light/${output.config.unique_id}/config`, output.config,
@@ -231,11 +207,7 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                         }),
                                 );
 
-                                return merge(config$, actionRequests$);
-
-                                // TODO: Per device, periodically emit a config. Or does MQTT sometimes require config to be sent ? If so we should add a Subject for this.
-                                // TODO: Per device, listen on the command_topic for state changes.
-                                //       On a state change request -> emit an command.
+                                return merge(config$, actionRequests$, outputStates$);
                             });
 
                         return merge(...observables);
@@ -244,50 +216,7 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
 
             // TODO: Also expose the Dobiss CAN Controller as a device ? So it's nice & neat in the device explorer ?
 
-            /*
-
-            */
-
-            // TMP STUFF
-            /*
-            const SWITCH_TOPIC = "dobiss/light/set";
-
-            const mqttTap = {
-                next(d: any) {
-                    console.log("MQTT", d);
-                },
-                error(e: Error) {
-                    console.error("MQTT", e);
-                },
-                complete() {
-                    console.log("MQTT DONE");
-                },
-            };
-
-            const switches$ = mqttClient
-                .subscribe$(SWITCH_TOPIC)
-                .pipe(
-                    tap(mqttTap),
-                );
-            */
-            // END TMP STUFF
-
-            // We make sure to provice an observable of observables.
-            // Every internal observable will complete when the jorb is done.
-            // So that the next observable can start.
-            // This way it's impossible to do multiple things at once on the socket.
-            const socketOperations$ = merge(actions$, polls$)
-                .pipe(
-                    // In the processor we will concatMap these so that we only do one action after the other.
-                    // Because we can't use the socket at the same time ... this is an easy way to do it.
-                    // This way the response of the socket will always be for the previous request too.
-                    // TODO: Look into changing the socket implemtation so that it can only do 1 request at a time. Just to be safe.
-                    concatMap((obs$) => {
-                        return obs$;
-                    }),
-                );
-
-            return merge(socketOperations$, relays$);
+            return merge(socketClient.consume$, relays$);
         }),
     );
 
@@ -303,26 +232,3 @@ processor$
             debug("completed processor");
         },
     });
-
-const toggleSalon: IRelayAction = { type: TYPES.toggle, location: "salon" };
-const toggleEetplaats: IRelayAction = { type: TYPES.toggle, location: "eetplaats" };
-
-const pollFirst: IPollAction = { type: TYPES.poll, location: 0x01 };
-const pollSecond: IPollAction = { type: TYPES.poll, location: 0x02 };
-
-// TODO: Create a service which will be based off of the config.
-//       It will expose an initial state for every configured light.
-//       If we push it states for a specific relais it will update the internal states of the lights.
-//       This big service will emit the full state of the light whenever it has changed.
-//       Everything needed to construct a message on mqtt to indicate the state of the light.
-// TODO: Create something which, given the config, will expose a set of lights.
-//commands$.next(toggleSalon);
-//commands$.next(toggleEetplaats);
-// commands$.next(pollFirst);
-
-// MQTT
-//
-// send "ON" or "OFF" on each 'light state topic'.
-// so we need to generate a topic per light.
-// listens on a light switch topic. / command topic.
-// where we will receive "ON" or "OFF".

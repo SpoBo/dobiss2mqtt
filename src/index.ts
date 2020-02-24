@@ -113,8 +113,7 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                             return empty();
                         }
 
-                        // 0x02 is toggle which should be OK for now
-                        const buffer = createRelayAction(location.relay, location.output, 0x02);
+                        const buffer = createRelayAction(location.relay, location.output, item.type);
 
                         if (!buffer) {
                             return empty();
@@ -212,7 +211,7 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                                     }),
                                                     tap({
                                                         next: ({ request, output }) => {
-                                                            commands$.next({ type: TYPES.on, location: output.name });
+                                                            commands$.next({ type: request.state === 'ON' ? TYPES.on : TYPES.off, location: output.name });
                                                         },
                                                     }),
                                                 );

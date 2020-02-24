@@ -107,7 +107,7 @@ export default class DobissState {
 
     public getLocation(name: string): Location | null {
         const found = this.config
-            .find(({ name }) => name === name);
+            .find((cfg) => cfg.name === name);
 
         if (!found) {
             return null;

@@ -200,7 +200,23 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                 // We want an observable to manage the full relay.
                                 // And we will merge these puppies.
                                 // TODO: This will be an observable which will emit an item whenever it notices an output changed state.
-                                const states$ = null;
+                                const actionRequests$ = merge(
+                                    ...relay.outputs
+                                        .map((output) => {
+                                            return mqttClient
+                                                .subscribe$(output.config["~"] + output.config.cmd_t.slice(1))
+                                                .pipe(
+                                                    map((request) => {
+                                                        return { request: JSON.parse(request), output };
+                                                    }),
+                                                    tap({
+                                                        next: ({ request, output }) => {
+                                                            commands$.next({ type: TYPES.on, location: output.name });
+                                                        },
+                                                    }),
+                                                );
+                                        }),
+                                );
 
                                 // Send discovery info for all the configured devices.
                                 // So this will be an array of observables which will each emit the config for every output.
@@ -215,7 +231,7 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                         }),
                                 );
 
-                                return config$;
+                                return merge(config$, actionRequests$);
 
                                 // TODO: Per device, periodically emit a config. Or does MQTT sometimes require config to be sent ? If so we should add a Subject for this.
                                 // TODO: Per device, listen on the command_topic for state changes.
@@ -300,8 +316,8 @@ const pollSecond: IPollAction = { type: TYPES.poll, location: 0x02 };
 //       This big service will emit the full state of the light whenever it has changed.
 //       Everything needed to construct a message on mqtt to indicate the state of the light.
 // TODO: Create something which, given the config, will expose a set of lights.
-// commands$.next(toggleSalon);
-// commands$.next(toggleEetplaats);
+//commands$.next(toggleSalon);
+//commands$.next(toggleEetplaats);
 // commands$.next(pollFirst);
 
 // MQTT

@@ -10,6 +10,8 @@ Maybe we should also expose the CAN Contoller as a virtual device which all
 other devices link to.
 * TODO [#B] Make the polling interval configurable
 It's now hardcoded to 500ms.
+* TODO [#B] Set up some testing
+Normally I test but it is a bit of a pain with RxJS.
 * TODO [#B] finetune socket management to give breathing room to other users of the socket
 I notice that a single CAN Programmer can only have a single active socket
 session. The Dobiss app also uses a socket connection to check the states of the

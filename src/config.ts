@@ -74,7 +74,7 @@ export default class ConfigManager {
 
                             if (!relay) {
                                 relay = {
-                                    id: output.output,
+                                    id: output.relay,
                                     outputs: [],
                                 };
 

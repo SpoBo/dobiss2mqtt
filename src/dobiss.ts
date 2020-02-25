@@ -99,10 +99,6 @@ export default class DobissState {
         this.config = config;
     }
 
-    public get lights$(): Observable<ILightState> {
-        return empty();
-    }
-
     // TODO: maybe output an observable which will start pinging the configured relays at a set interval.
 
     public getLocation(name: string): Location | null {

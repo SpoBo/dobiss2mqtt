@@ -1,16 +1,9 @@
 import DEBUG from "debug";
 
-import DobissState,
-{
-    createPingForState,
-    createRelayAction,
-} from "./dobiss";
-
-import SocketClient from "./rx-socket";
-
 import {
     combineLatest,
     empty,
+    from,
     interval,
     merge,
     Subject,
@@ -19,29 +12,29 @@ import {
 
 import {
     concatMap,
+    distinctUntilChanged,
     filter,
+    groupBy,
     map,
+    mergeMap,
     switchMap,
     tap,
 } from "rxjs/operators";
 
+import DobissState,
+{
+    createPingForState,
+    createRelayAction,
+} from "./dobiss";
+
+import SocketClient from "./rx-socket";
+
 import { RxMqtt } from "./rx-mqtt";
 
-import ConfigManager, { IRelayOutputConfig } from "./config";
+import ConfigManager from "./config";
+import { convertBufferToByteArray } from "./helpers";
 
-interface IMQTTLightConfig {
-    name: string;
-    unique_id: string;
-    command_topic: string;
-    optimistic?: boolean;
-    state_topic: string;
-    device: {
-        manufacturer?: string,
-        name?: string,
-    };
-}
-
-enum TYPES {
+enum ACTION_TYPES {
     toggle,
     on,
     off,
@@ -129,13 +122,14 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                     ...relay.outputs
                                         .map((output) => {
                                             return mqttClient
+                                                // TODO: replace '~' with config['~']
                                                 .subscribe$(output.config["~"] + output.config.cmd_t.slice(1))
                                                 .pipe(
                                                     map((request) => {
                                                         return { request: JSON.parse(request), output };
                                                     }),
                                                     switchMap(({ request, output }) => {
-                                                        const type = request.state === "ON" ? TYPES.on : TYPES.off;
+                                                        const type = request.state === "ON" ? ACTION_TYPES.on : ACTION_TYPES.off;
 
                                                         // Grab the location to perform the actions on.
                                                         const location = { output: output.output, relay: output.relay };
@@ -150,17 +144,15 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                                             return empty();
                                                         }
 
-                                                        // TODO: We can try to emit a new state poll request for this relay when we know the state change was processed.
-                                                        //       For this I think we will need to rejigger how we emit commands.
                                                         return socketClient
                                                             .send(buffer)
                                                             .pipe(
-                                                                map((response) => {
-                                                                    return {
-                                                                        request,
-                                                                        response,
-                                                                        output,
-                                                                    };
+                                                                tap({
+                                                                    next() {
+                                                                        // As a side-effect trugger a manual ping on success.
+                                                                        manualPing$
+                                                                            .next("manual");
+                                                                    },
                                                                 }),
                                                             );
                                                     }),
@@ -168,41 +160,91 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                         }),
                                 );
 
-                                // const requestState = new Subject()
+                                // TODO: Make this configurable. 500 seems nice though.
+                                const periodicallyRequest$ = interval(500);
 
-                                // TODO: Periodically ping the state and keep a rolling state for every output. Only when a change of the state is detected will we emit the new state.
-                                // TODO: Automatically ping the state after an action request.
-                                const periodicallyRequest$ = interval(5000)
+                                const manualPing$ = new Subject();
+
+                                const polls$ = merge(periodicallyRequest$, manualPing$)
                                     .pipe(
-                                        tap({
-                                            next(v) {
-                                                console.log("INTERVAL", v);
-                                            },
+                                        switchMap(() => {
+                                            return socketClient
+                                                .send(createPingForState({ relais: relay.id }))
+                                                .pipe(
+                                                    switchMap((response) => {
+                                                        const byteArray = convertBufferToByteArray(response);
+                                                        const startBit = 4 * 8;
+                                                        const states = byteArray.slice(startBit, startBit + 12);
+
+                                                        const combined = states
+                                                            .map((state, index) => {
+                                                                const output = relay
+                                                                    .outputs
+                                                                    .find((output) => {
+                                                                        return output.output === index;
+                                                                    });
+
+                                                                if (!output) {
+                                                                    return null;
+                                                                }
+
+                                                                return {
+                                                                    config: output.config,
+                                                                    state,
+                                                                };
+                                                            })
+                                                            .filter((v) => v);
+
+                                                        return from(combined);
+                                                    },
+                                                ));
                                         }),
                                     );
 
-                                const polls$ = merge(periodicallyRequest$);
-                                /*
-                                  const response$ = socketClient
-                                      .send(createPingForState({ relais: item.location as number }));
-                                */
+                                const outputStates$ = merge(polls$)
+                                    .pipe(
+                                        // Create an observable per unique_id and monitor a change in state
+                                        // for every output in order to push it to mqtt.
+                                        groupBy((v) => v?.config?.unique_id),
+                                        mergeMap((states$) => {
+                                            return states$
+                                                .pipe(
+                                                    // Only continue when the state effectively changed.
+                                                    distinctUntilChanged((a, b) => {
+                                                        return a?.state === b?.state;
+                                                    }),
+                                                    switchMap((update) => {
+                                                        if (!update) {
+                                                            return empty();
+                                                        }
 
-                                // TODO: We need a pipe where we emit events for every output.
-                                //       The events will contain the config per output as well as the latest state.
-                                //       We will then groupBy per unique_id
-                                //       When we detect a change of state per unique_id (or the initial state) we will emit a message on MQTT indicating the new state for this specific output.
-                                const outputStates$ = empty();
+                                                        const payload = JSON.stringify({
+                                                            state: update?.state ? "ON" : "OFF",
+                                                        });
+
+                                                        return mqttClient
+                                                            .publish$(
+                                                                update.config.stat_t.replace("~", update.config["~"]),
+                                                                payload,
+                                                            );
+                                                    }),
+                                                );
+                                        }),
+                                    );
 
                                 // Send discovery info for all the configured devices.
-                                // So this will be an array of observables which will each emit the config for every output.
+                                // So this will be an array of observables which will each emit
+                                // the config for every output.
+                                // TODO: Do we do this on an interval ?
+                                //       Do we do this after a specific mqtt request ?
                                 const config$ = merge(
                                     ...relay
                                         .outputs
                                         .map((output) => {
-                                            // TODO: Do we do this on an interval ? Do we do this after a specific mqtt request ?
                                             return mqttClient
                                                 .publish$(
-                                                    `homeassistant/light/${output.config.unique_id}/config`, output.config,
+                                                    `homeassistant/light/${output.config.unique_id}/config`,
+                                                    output.config,
                                                 );
                                         }),
                                 );
@@ -222,9 +264,6 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
 
 processor$
     .subscribe({
-        next: (out: any) => {
-            debug("processed %o", out);
-        },
         error(e) {
             debug("ERROR %o", e);
         },

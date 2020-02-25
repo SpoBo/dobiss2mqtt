@@ -1,4 +1,5 @@
-import { empty, from, Observable } from "rxjs";
+import { from, Observable } from "rxjs";
+
 import { map } from "rxjs/operators";
 
 type AllRelaysConfig = SingleRelayConfig[];
@@ -59,6 +60,10 @@ export default class ConfigManager {
             );
     }
 
+    /**
+     * Exposes the relay config in a structured way.
+     * multiple relays. 1 relay has multiple outputs.
+     */
     public get relays$(): Observable<IRelayConfig[]> {
         return this
             .outputs$
@@ -89,6 +94,10 @@ export default class ConfigManager {
             );
     }
 
+    /**
+     * Exposes the CAN controller config.
+     * This is just the host and the port.
+     */
     public get dobissCANController$(): Observable<IDobissConfig> {
         return this.config$
             .pipe(
@@ -98,6 +107,9 @@ export default class ConfigManager {
             );
     }
 
+    /**
+     * Exposes the MQTT config.
+     */
     public get mqtt$(): Observable<IMqttConfig> {
         return this.config$
             .pipe(

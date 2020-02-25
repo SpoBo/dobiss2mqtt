@@ -10,7 +10,7 @@ const debug = DEBUG("dobiss2mqtt.mqtt");
 interface ISimplifiedMqttClient {
     message$: Observable<[ string, Buffer, IPubrecPacket ]>;
     subscribe$: ({ topic }: { topic: string }) => Observable<any>;
-    publish: ({ topic, payload } : { topic: string, payload: string | Buffer }) => Observable<any>;
+    publish$: ({ topic, payload }: { topic: string, payload: string | Buffer }) => Observable<any>;
 }
 
 export class RxMqtt {
@@ -50,7 +50,7 @@ export class RxMqtt {
                         payload = JSON.stringify(payload);
                     }
 
-                    return d.publish({ topic, payload });
+                    return d.publish$({ topic, payload });
                 }),
             );
     }
@@ -71,6 +71,17 @@ function client (url: string): Observable<ISimplifiedMqttClient> {
 
             subscriber.next({
                 message$: fromEvent(client, "message"),
+                publish$: ({ topic, payload }: { topic: string, payload: string | Buffer }) => {
+                    return new Observable((subscriber) => {
+                        client.publish(topic, payload, (err) => {
+                            if (err) {
+                                subscriber.error(err);
+                            }
+
+                            subscriber.complete();
+                        });
+                    });
+                },
                 subscribe$: ({ topic }: { topic: string }) => {
                     return new Observable((subscriber) => {
                         client.subscribe(topic, (err) => {
@@ -82,18 +93,6 @@ function client (url: string): Observable<ISimplifiedMqttClient> {
                         });
                     });
                 },
-                publish: ({ topic, payload }: { topic: string, payload: string | Buffer }) => {
-                    return new Observable((subscriber) => {
-                        client.publish(topic, payload, (err) => {
-                            if (err) {
-                                subscriber.error(err);
-                            }
-
-                            subscriber.complete();
-                        });
-                    });
-                },
-                // TODO: Maybe add an unsubscribe ?
             });
         });
 

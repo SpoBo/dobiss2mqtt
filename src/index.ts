@@ -7,13 +7,10 @@ import {
     interval,
     merge,
     Subject,
-    timer,
 } from "rxjs";
 
 import {
-    concatMap,
     distinctUntilChanged,
-    filter,
     groupBy,
     map,
     mergeMap,
@@ -21,8 +18,7 @@ import {
     tap,
 } from "rxjs/operators";
 
-import DobissState,
-{
+import {
     createPingForState,
     createRelayAction,
 } from "./dobiss";
@@ -31,7 +27,7 @@ import SocketClient from "./rx-socket";
 
 import { RxMqtt } from "./rx-mqtt";
 
-import ConfigManager from "./config";
+import ConfigManager, { IRelayOutputConfig } from "./config";
 import { convertBufferToByteArray } from "./helpers";
 
 enum ACTION_TYPES {
@@ -47,22 +43,14 @@ const debug = DEBUG("dobiss2mqtt.index");
 // As soon as the config changes and it impacts this part of the config it will emit a new value.
 const configManager = new ConfigManager(process.env.CONFIG_PATH || "../config");
 
-const state$ = configManager
-    .outputs$
-    .pipe(
-        map((relayConfig) => {
-            return new DobissState(relayConfig);
-        }),
-    );
-
 /**
  * I know this is overkill.
  *
  * But now we will not need to restart the service when the config changes :p
  */
-const processor$ = combineLatest(state$, configManager.dobissCANController$, configManager.mqtt$)
+const processor$ = combineLatest(configManager.dobissCANController$, configManager.mqtt$)
     .pipe(
-        switchMap(([ state, canControllerConfig, mqttConfig ]) => {
+        switchMap(([ canControllerConfig, mqttConfig ]) => {
             // Create a SocketClient which will kick into gear when we need it.
             const socketClient = new SocketClient({
                 host: canControllerConfig.host,
@@ -71,6 +59,10 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
 
             // Create the MQTT client which will also kick into gear when we need it.
             const mqttClient = new RxMqtt(mqttConfig.url);
+
+            function createId (output: IRelayOutputConfig, ip: string) {
+                return `dobiss_mqtt_${ip.replace(/\./g, "_")}_output_${output.relay}x${output.output}`;
+            }
 
             const relaysWithMQTTConfig$ = configManager
                 .relays$
@@ -83,24 +75,22 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                 outputs: relay
                                     .outputs
                                     .map((output) => {
-                                        const id = `dobiss_mqtt_${canControllerConfig.host.replace(/\./g, "_")}_output_${output.relay}x${output.output}`;
+                                        const id = createId(output, canControllerConfig.host);
 
                                         return {
                                             ...output,
                                             config: {
-                                                "~": `homeassistant/light/${id}`,
                                                 "cmd_t": `~/set`,
-                                                "schema": "json",
                                                 "device": {
                                                   manufacturer: "Dobiss",
-                                                  //name: "CAN Controller Relay Output Switch",
+                                                  name: output.name,
                                                },
                                                 "name": output.name,
                                                 "optimistic": false,
-                                                // TODO: Check how we can suport dimmers. Don't have a dimmer though.
-                                                "brightness": false,
+                                                "schema": "json",
                                                 "stat_t": `~/state`,
                                                 "unique_id": id,
+                                                "~": `homeassistant/light/${id}`,
                                             },
                                         };
                                     }),
@@ -117,19 +107,21 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                         // Discovery, listening to MQTT, emitting states on statechange, etc.
                         const observables = relays
                             .map((relay) => {
-                                // This will listen to state change requests and emit a command relevant to the state request.
                                 const actionRequests$ = merge(
                                     ...relay.outputs
                                         .map((output) => {
                                             return mqttClient
-                                                // TODO: replace '~' with config['~']
-                                                .subscribe$(output.config["~"] + output.config.cmd_t.slice(1))
+                                                .subscribe$(output.config.cmd_t.replace("~", output.config["~"]))
                                                 .pipe(
                                                     map((request) => {
-                                                        return { request: JSON.parse(request), output };
+                                                        return { request: JSON.parse(request) };
                                                     }),
-                                                    switchMap(({ request, output }) => {
-                                                        const type = request.state === "ON" ? ACTION_TYPES.on : ACTION_TYPES.off;
+                                                    switchMap(({ request }) => {
+                                                        const type = request.state === "ON"
+                                                            ?
+                                                            ACTION_TYPES.on
+                                                            :
+                                                            ACTION_TYPES.off;
 
                                                         // Grab the location to perform the actions on.
                                                         const location = { output: output.output, relay: output.relay };
@@ -138,7 +130,11 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                                             return empty();
                                                         }
 
-                                                        const buffer = createRelayAction(location.relay, location.output, type);
+                                                        const buffer = createRelayAction(
+                                                            location.relay,
+                                                            location.output,
+                                                            type,
+                                                        );
 
                                                         if (!buffer) {
                                                             return empty();
@@ -149,7 +145,8 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                                             .pipe(
                                                                 tap({
                                                                     next() {
-                                                                        // As a side-effect trugger a manual ping on success.
+                                                                        // As a side-effect,
+                                                                        // trigger a manual ping on success.
                                                                         manualPing$
                                                                             .next("manual");
                                                                     },
@@ -160,7 +157,6 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                         }),
                                 );
 
-                                // TODO: Make this configurable. 500 seems nice though.
                                 const periodicallyRequest$ = interval(500);
 
                                 const manualPing$ = new Subject();
@@ -180,8 +176,8 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                                             .map((state, index) => {
                                                                 const output = relay
                                                                     .outputs
-                                                                    .find((output) => {
-                                                                        return output.output === index;
+                                                                    .find((item) => {
+                                                                        return item.output === index;
                                                                     });
 
                                                                 if (!output) {
@@ -235,8 +231,6 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                                 // Send discovery info for all the configured devices.
                                 // So this will be an array of observables which will each emit
                                 // the config for every output.
-                                // TODO: Do we do this on an interval ?
-                                //       Do we do this after a specific mqtt request ?
                                 const config$ = merge(
                                     ...relay
                                         .outputs
@@ -256,8 +250,6 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
                     }),
                 );
 
-            // TODO: Also expose the Dobiss CAN Controller as a device ? So it's nice & neat in the device explorer ?
-
             return merge(socketClient.consume$, relays$);
         }),
     );
@@ -265,7 +257,8 @@ const processor$ = combineLatest(state$, configManager.dobissCANController$, con
 processor$
     .subscribe({
         error(e) {
-            debug("ERROR %o", e);
+            console.error("ERROR %o", e);
+            process.exit(1);
         },
         complete() {
             debug("completed processor");

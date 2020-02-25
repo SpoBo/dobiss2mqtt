@@ -40,7 +40,6 @@ export default class SocketClient {
                     }),
                     // By taking only 1 we will always complete.
                     take(1),
-                    // TODO: Add a very short timeout behaviour too so we force everything to error if it does not complete quickly.
                     tap({
                         next(value) {
                             subscriber.next(value);

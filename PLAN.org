@@ -1,0 +1,41 @@
+#+TITLE: Plan of Attack
+* TODO [#A] get a docker build working
+Also update the readme for this.
+Needs to accept a config file which is then used.
+* TODO [#A] figure out how to expose real devices to Home Assistant
+Right now they are entities not connected to a real device. Which is a bit of a
+bummer. I'd like the lights to be first-class citizens in Home Assistant.
+
+Maybe we should also expose the CAN Contoller as a virtual device which all
+other devices link to.
+* TODO [#B] Make the polling interval configurable
+It's now hardcoded to 500ms.
+* TODO [#B] finetune socket management to give breathing room to other users of the socket
+I notice that a single CAN Programmer can only have a single active socket
+session. The Dobiss app also uses a socket connection to check the states of the
+lights. So it's important to not hog the socket connection if it's not needed.
+That said, it's kind of needed because we need to constantly ping the CAN
+Programmer to check the state of the relay outputs.
+* TODO [#B] Add a timeout operator to the socket requests
+This way we will ensure we do terminate every socket request after a while. Even
+if the CAN controller is left hanging.
+* TODO [#C] add authentication for mqtt
+* look into dimmers supported by dobiss
+* [#A] look into switches
+I'll probably have to hook hardware into the TCP loops for the switches. Then I
+can intercept the keypress messages per switch. This will then allow me to
+expose those switches as real switches in mqtt.
+
+So it'll probably be another project which has to be deployed on ESP modules.
+* [#B] look into restarting automatically when things go away (like the socket or mqtt)
+* [#C] make the config live reload
+We can make it live reload for shits & giggles.
+Might be nice when you are finetuning your configuration.
+
+If we do this then we need to make sure to somehow re-emit the config when we
+update it. And if we remove an output then we should emit blank config for that
+output so that Home Assistant can remove the device / entity.
+* Get [[https://volta.sh][https://volta.sh]] working properly
+It's in package.json but I don't really see it working yet on my machine.
+* Figure out if Home Assistant emits a request for config as part of the discovery protocol
+It might do something like this. And we could then re-emit all the config we have.

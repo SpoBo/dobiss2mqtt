@@ -9,7 +9,7 @@
         "lint": "tslint src/*",
         "build": "tsc",
         "validate": "npm run build && npm run lint",
-        "start": "DEBUG=* CONFIG_PATH=../data/config ts-node-dev --cls --ignore-watch ./data/ -- ./src/index.ts",
+        "start": "DEBUG=* CONFIG_PATH=./data/config.js ts-node-dev --cls --ignore-watch ./data/ -- ./src/index.ts",
         "start:prod": "NODE_ENV=production node ./dist/index.js"
     },
     "volta": {
@@ -17,11 +17,13 @@
     },
     "dependencies": {
         "@types/debug": "^4.1.5",
+        "convict": "^5.2.0",
         "debug": "^4.1.1",
         "mqtt": "^3.0.0",
         "rxjs": "^6.5.4"
     },
     "devDependencies": {
+        "@types/convict": "^4.2.1",
         "@types/mqtt": "^2.5.0",
         "@types/node": "^13.7.5",
         "ts-lint": "^4.5.1",

@@ -1,47 +1,51 @@
-// NOTE: This can also be a JSON file if you prefer. All node cares about is that it eventually receives a JS object from the file with the configuration on it.
-
 module.exports = {
     dobiss: {
         // NOTE: this whole object maps to the first argument of socketInstance.connect
         // https://nodejs.org/api/net.html#net_socket_connect_options_connectlistener
-        host: '10.0.0.8',
-        port: 10001
+        host: '10.0.0.8', // DOBISS_HOST
+        port: 10001 // DOBISS_PORT
     },
     mqtt: {
         // TODO: When tweaking authentication support for MQTT look into how we can add other parameters.
         //       I prefer something which just maps 1:1.
-        url: 'mqtt://host'
+        url: 'mqtt://host' // MQTT_URL
     },
-    // This is the configuration for your relays.
-    // It's basically an array with the first relaying being the first item in the array.
-    // The item are arrays which in turn contain the outputs.
-    // The outputs (or lights in my case) are just represented as strings which are used to give them their names.
-    relays: [
-        // first relay
-        [
-            // first output
-            "berging",
-            "koele_berging",
-            "wc",
-            "inkomhal",
-            "inkomdeur",
-            "salon",
-            "eetplaats",
-            "keuken",
-            "terras",
-            "badkamer",
-            "master_bedroom",
-            "dressing"
-        ],
-        // second relay
-        [
-            // first output
-            "nachthal",
-            "office",
-            "fitness",
-            "traphal",
-            "zolder_1",
-            "zolder_2",
-        ]
+    pollIntervalInMs: 500, // POLL_INTERVAL_IN_MS
+    modules: [
+        {
+            // For now only "relay" works. So we can only turn outputs on or off.
+            // But these might be supported in the future: "dimmer", "0-10v"
+            type: 'relay',
+            // Either manually set the number of the relay or let dobiss2mqtt set the number automatically
+            // depending on the order if the module in the array.
+            number: 1,
+            // The outputs (or lights in my case) are just represented as strings which are used to
+            // give them their names.
+            outputs: [
+                "berging",
+                "koele_berging",
+                "wc",
+                "inkomhal",
+                "inkomdeur",
+                "salon",
+                "eetplaats",
+                "keuken",
+                "terras",
+                "badkamer",
+                "master_bedroom",
+                "dressing"
+            ]
+        },
+        {
+            type: 'relay',
+            outputs: [
+                "nachthal",
+                "office",
+                "fitness",
+                "traphal",
+                "zolder_1",
+                "zolder_2",
+            ]
+        },
     ]
 }

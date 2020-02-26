@@ -3,7 +3,7 @@
 This service needs to be pointed to a Dobiss CAN Programmer as well as an MQTT
 server.
 
-It will then expose your lights as MQTT lights using the Home Assistant
+It will then expose your lights (outputs) as MQTT lights using the Home Assistant
 discovery protocol.
 
 For now this only supports basic lights since I'm a cheap bastard and I only have
@@ -22,15 +22,31 @@ the state of every relay you have.
 ## Config
 
 See [data/config.js.example](data/config.js.example) for the main configuration. Rename it
-to `config.js` and place it under the data folder when using docker.
+to `config.js` and place it under the data folder.
 
-There are also a couple ENV overrides
+There are also a couple ENV overrides which can also be controlled from the
+config.js file.
 
 To control the polling interval:
 POLL_INTERVAL_IN_MS=500
 
-To control where the config.js file is located:
+To control where the config.js file is located. It is from the root of the node
+app itself should you provide a relative path:
 CONFIG_PATH=/data/config.js
+
+To control the mqtt url:
+MQTT_URL
+
+To control the dobiss host:
+DOBISS_HOST
+
+To control the dobiss port:
+DOBISS_PORT
+
+To control the logging the debug package is used for now. dobiss2mqtt loggers
+are always namespaced on `dobiss2mqtt.`. So you can use this as your filter.
+
+By default on docker there is no logging enabled except when it crashes.
 
 ## Installation
 
@@ -46,19 +62,11 @@ services:
   dobiss2mqtt:
     container_name: dobiss2mqtt
     image: vincentds/dobiss2mqtt:latest
-    restart: always
-    networks:
-      - internal
+    restart: unless-stopped
     volumes:
-    - read_only: true
-      source: /etc/localtime
-      target: /etc/localtime
-      type: bind
     - source: /tank/configs/dobiss2mqtt
       target: /data
       type: bind
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
 ```
 
 ## Development
@@ -70,7 +78,7 @@ Create a `config.js` file in the data folder based on the example file provided.
 `npm i && npm run start` should get you up and running with ts-node-dev
 executing the typescript code and restarting automatically when you make a change.
 
-It will set the ENV of CONFIG_PATH to ../data/config so that it will load the
+It will set the ENV of CONFIG_PATH to ./data/config.js so that it will load the
 correct file.
 
 It's set up to ignore reloading when the config.js file changes.

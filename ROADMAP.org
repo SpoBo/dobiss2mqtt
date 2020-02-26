@@ -1,4 +1,15 @@
 #+TITLE: Plan of Attack
+* DONE [#A] Implement [[https://github.com/mozilla/node-convict][Convict]] for the config
+Also rework how we do the config.
+
+Have modules. Every module should have a type. relay, dimmer or 1-10v. moods ?
+Every module type can have another mechanism to ping the states. I don't think
+we can ping moods.
+
+Every module has multiple outputs. We should be able to enter unused slots.
+* [#B] Add yaml support for the config
+Now that convict is in place it should be easy. It's mostly documentation and
+adding the yaml parser. It will increase the size of the docker container though.
 * DONE [#A] get a docker build working
 :LOGBOOK:
 CLOCK: [2020-02-26 Mi 08:58]--[2020-02-26 Mi 11:01] =>  2:03
@@ -66,7 +77,6 @@ Then we can create a HEALTHCHECK script which will read the file and see if it
 exists. If so, delete it and mark us unhealthy. If it does not exist we are healthy.
 * Figure out if Home Assistant emits a request for config as part of the discovery protocol
 It might do something like this. And we could then re-emit all the config we have.
-* [#B] Implement [[https://github.com/mozilla/node-convict][Convict]] for the config
 * [#B] Support Dimmers
 Can it be done through CAN Programmer ?
 * Support Covers

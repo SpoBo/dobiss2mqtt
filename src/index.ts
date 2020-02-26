@@ -27,10 +27,8 @@ import SocketClient from "./rx-socket";
 
 import { RxMqtt } from "./rx-mqtt";
 
-import ConfigManager from "./config";
+import ConfigManager, { ModuleType } from "./config";
 import { convertBufferToByteArray } from "./helpers";
-
-const POLL_INTERVAL_IN_MS = Number(process.env.POLL_INTERVAL_IN_MS) || 500;
 
 const DOBISS_NAMESPACE = "dobiss";
 
@@ -45,14 +43,19 @@ const debug = DEBUG("dobiss2mqtt.index");
 
 // This preps the config and moves it into several observables.
 // As soon as the config changes and it impacts this part of the config it will emit a new value.
-const configManager = new ConfigManager(process.env.CONFIG_PATH || "/data/config");
+// /data/config.js is the default location if we run under docker and mount the data folder.
+const configManager = new ConfigManager(process.env.CONFIG_PATH || "/data/config.js");
 
 /**
  * I know this is overkill.
  */
-const processor$ = combineLatest(configManager.dobissCAN$, configManager.mqtt$)
+const processor$ = combineLatest(
+        configManager.dobiss$,
+        configManager.mqtt$,
+        configManager.pollInterval$,
+    )
     .pipe(
-        switchMap(([ canConfig, mqttConfig ]) => {
+        switchMap(([ canConfig, mqttConfig, pollInterval ]) => {
             const canIdentifier = `${DOBISS_NAMESPACE}_mqtt_${canConfig.host.replace(/\./g, "_")}`;
 
             // Create a SocketClient which will kick into gear when we need it.
@@ -69,17 +72,21 @@ const processor$ = combineLatest(configManager.dobissCAN$, configManager.mqtt$)
             }
 
             const relaysWithMQTTConfig$ = configManager
-                .relays$
+                .modules$
                 .pipe(
-                    map((relays) => {
-                        return relays
-                        .map((relay) => {
+                    map((modules) => {
+                        return modules
+                        .map((module) => {
+                            if (module.type !== ModuleType.relay) {
+                                throw new Error("Only relay modules are supported for now.");
+                            }
+
                             return {
-                                ...relay,
-                                outputs: relay
+                                ...module,
+                                outputs: module
                                     .outputs
                                     .map((output) => {
-                                        const outputId = `output_${output.relay}x${output.output}`;
+                                        const outputId = `output_${module.address}x${output.address}`;
                                         const id = `${canIdentifier}_${outputId}`;
 
                                         return {
@@ -110,14 +117,14 @@ const processor$ = combineLatest(configManager.dobissCAN$, configManager.mqtt$)
 
             const relays$ = relaysWithMQTTConfig$
                 .pipe(
-                    switchMap((relays) => {
+                    switchMap((modules) => {
                         // This will contain an observable per relay.
                         // That observable will manage everything for all outputs on that relay.
                         // Discovery, listening to MQTT, emitting states on statechange, etc.
-                        const observables = relays
-                            .map((relay) => {
+                        const observables = modules
+                            .map((module) => {
                                 const actionRequests$ = merge(
-                                    ...relay.outputs
+                                    ...module.outputs
                                         .map((output) => {
                                             return mqttClient
                                                 .subscribe$(output.config.cmd_t.replace("~", output.config["~"]))
@@ -132,16 +139,9 @@ const processor$ = combineLatest(configManager.dobissCAN$, configManager.mqtt$)
                                                             :
                                                             ACTION_TYPES.off;
 
-                                                        // Grab the location to perform the actions on.
-                                                        const location = { output: output.output, relay: output.relay };
-
-                                                        if (!location) {
-                                                            return empty();
-                                                        }
-
                                                         const buffer = createRelayAction(
-                                                            location.relay,
-                                                            location.output,
+                                                            module.address,
+                                                            output.address,
                                                             type,
                                                         );
 
@@ -166,7 +166,7 @@ const processor$ = combineLatest(configManager.dobissCAN$, configManager.mqtt$)
                                         }),
                                 );
 
-                                const periodicallyRequest$ = interval(POLL_INTERVAL_IN_MS);
+                                const periodicallyRequest$ = interval(pollInterval);
 
                                 const manualPing$ = new Subject();
 
@@ -174,7 +174,7 @@ const processor$ = combineLatest(configManager.dobissCAN$, configManager.mqtt$)
                                     .pipe(
                                         switchMap(() => {
                                             return socketClient
-                                                .send(createPingForState({ relais: relay.id }))
+                                                .send(createPingForState({ relais: module.address }))
                                                 .pipe(
                                                     switchMap((response) => {
                                                         const byteArray = convertBufferToByteArray(response);
@@ -183,10 +183,10 @@ const processor$ = combineLatest(configManager.dobissCAN$, configManager.mqtt$)
 
                                                         const combined = states
                                                             .map((state, index) => {
-                                                                const output = relay
+                                                                const output = module
                                                                     .outputs
-                                                                    .find((item) => {
-                                                                        return item.output === index;
+                                                                    .find((outputItem) => {
+                                                                        return outputItem.address === index;
                                                                     });
 
                                                                 if (!output) {
@@ -245,7 +245,7 @@ const processor$ = combineLatest(configManager.dobissCAN$, configManager.mqtt$)
                                 // So this will be an array of observables which will each emit
                                 // the config for every output.
                                 const config$ = merge(
-                                    ...relay
+                                    ...module
                                         .outputs
                                         .map((output) => {
                                             return mqttClient

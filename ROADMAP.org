@@ -66,3 +66,16 @@ Then we can create a HEALTHCHECK script which will read the file and see if it
 exists. If so, delete it and mark us unhealthy. If it does not exist we are healthy.
 * Figure out if Home Assistant emits a request for config as part of the discovery protocol
 It might do something like this. And we could then re-emit all the config we have.
+* [#B] Implement [[https://github.com/mozilla/node-convict][Convict]] for the config
+* [#B] Support Dimmers
+Can it be done through CAN Programmer ?
+* Support Covers
+Can it be done through CAN Programmer ?
+* Support Power Plugs
+Can it be done through CAN Programmer ?
+* Support Ventilation
+Can it be done through CAN Programmer ?
+* Support Timers
+Can it be done through CAN Programmer ?
+* Support Moods
+Can it be done through CAN Programmer ?

@@ -1,6 +1,6 @@
 import DEBUG from "debug";
 
-import { connect, IPubrecPacket, MqttClient } from "mqtt";
+import { connect, IClientPublishOptions, IPubrecPacket, MqttClient } from "mqtt";
 
 import { concat, fromEvent, Observable } from "rxjs";
 import { filter, map, shareReplay, switchMap, tap } from "rxjs/operators";
@@ -10,7 +10,11 @@ const debug = DEBUG("dobiss2mqtt.mqtt");
 interface ISimplifiedMqttClient {
     message$: Observable<[ string, Buffer, IPubrecPacket ]>;
     subscribe$: ({ topic }: { topic: string }) => Observable<any>;
-    publish$: ({ topic, payload }: { topic: string, payload: string | Buffer }) => Observable<any>;
+    publish$: ({
+        topic,
+        payload,
+        options,
+    }: { topic: string, payload: string | Buffer, options?: IClientPublishOptions }) => Observable<any>;
 }
 
 export class RxMqtt {
@@ -42,7 +46,7 @@ export class RxMqtt {
             );
     }
 
-    public publish$(topic: string, payload: string | Buffer | object) {
+    public publish$(topic: string, payload: string | Buffer | object, options?: IClientPublishOptions) {
         return this.client$
             .pipe(
                 switchMap((d) => {
@@ -50,7 +54,7 @@ export class RxMqtt {
                         payload = JSON.stringify(payload);
                     }
 
-                    return d.publish$({ topic, payload });
+                    return d.publish$({ topic, payload, options });
                 }),
             );
     }
@@ -71,9 +75,17 @@ function client (url: string): Observable<ISimplifiedMqttClient> {
 
             subscriber.next({
                 message$: fromEvent(client, "message"),
-                publish$: ({ topic, payload }: { topic: string, payload: string | Buffer }) => {
+                publish$: ({
+                    options,
+                    payload,
+                    topic,
+                }: { topic: string, payload: string | Buffer, options?: IClientPublishOptions }) => {
                     return new Observable((publishSubscriber) => {
-                        client.publish(topic, payload, (err) => {
+                        if (!options) {
+                            options = { qos: 1 };
+                        }
+
+                        client.publish(topic, payload, options, (err) => {
                             if (err) {
                                 publishSubscriber.error(err);
                             }

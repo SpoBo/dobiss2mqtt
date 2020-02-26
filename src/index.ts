@@ -27,10 +27,12 @@ import SocketClient from "./rx-socket";
 
 import { RxMqtt } from "./rx-mqtt";
 
-import ConfigManager, { IRelayOutputConfig } from "./config";
+import ConfigManager from "./config";
 import { convertBufferToByteArray } from "./helpers";
 
 const POLL_INTERVAL_IN_MS = Number(process.env.POLL_INTERVAL_IN_MS) || 500;
+
+const DOBISS_NAMESPACE = "dobiss";
 
 enum ACTION_TYPES {
     toggle,
@@ -51,6 +53,8 @@ const configManager = new ConfigManager(process.env.CONFIG_PATH || "/data/config
 const processor$ = combineLatest(configManager.dobissCANController$, configManager.mqtt$)
     .pipe(
         switchMap(([ canControllerConfig, mqttConfig ]) => {
+            const canControllerIdentifier = `${DOBISS_NAMESPACE}_mqtt_${canControllerConfig.host.replace(/\./g, "_")}`;
+
             // Create a SocketClient which will kick into gear when we need it.
             const socketClient = new SocketClient({
                 host: canControllerConfig.host,
@@ -60,8 +64,8 @@ const processor$ = combineLatest(configManager.dobissCANController$, configManag
             // Create the MQTT client which will also kick into gear when we need it.
             const mqttClient = new RxMqtt(mqttConfig.url);
 
-            function createId (output: IRelayOutputConfig, ip: string) {
-                return `dobiss_mqtt_${ip.replace(/\./g, "_")}_output_${output.relay}x${output.output}`;
+            function createId (output: string, ip: string) {
+                return `dobiss_mqtt__${output}`;
             }
 
             const relaysWithMQTTConfig$ = configManager
@@ -75,15 +79,20 @@ const processor$ = combineLatest(configManager.dobissCANController$, configManag
                                 outputs: relay
                                     .outputs
                                     .map((output) => {
-                                        const id = createId(output, canControllerConfig.host);
+                                        const outputId = `output_${output.relay}x${output.output}`;
+                                        const id = `${canControllerIdentifier}_${outputId}`;
 
                                         return {
                                             ...output,
                                             config: {
                                                 "cmd_t": `~/set`,
                                                 "device": {
+                                                  identifiers: [
+                                                      `${DOBISS_NAMESPACE}_${outputId}`,
+                                                  ],
                                                   manufacturer: "Dobiss",
                                                   name: output.name,
+                                                  via_device: canControllerIdentifier,
                                                },
                                                 "name": output.name,
                                                 "optimistic": false,
@@ -222,6 +231,10 @@ const processor$ = combineLatest(configManager.dobissCANController$, configManag
                                                             .publish$(
                                                                 update.config.stat_t.replace("~", update.config["~"]),
                                                                 payload,
+                                                                {
+                                                                    qos: 1,
+                                                                    retain: true,
+                                                                },
                                                             );
                                                     }),
                                                 );

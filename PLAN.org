@@ -1,18 +1,13 @@
 #+TITLE: Plan of Attack
-* TODO [#A] get a docker build working
+* DONE [#A] get a docker build working
 :LOGBOOK:
-CLOCK: [2020-02-26 Mi 08:58]
+CLOCK: [2020-02-26 Mi 08:58]--[2020-02-26 Mi 11:01] =>  2:03
 :END:
-Also update the readme for this.
-Needs to accept a config file which is then used.
-* TODO [#A] figure out how to expose real devices to Home Assistant
-Right now they are entities not connected to a real device. Which is a bit of a
-bummer. I'd like the lights to be first-class citizens in Home Assistant.
-
-Maybe we should also expose the CAN Contoller as a virtual device which all
-other devices link to.
+Updated readme. Docker container is running but homeassistant is not really
+working well right now ? Seems like zigbee2mqtt is also not working.
+* DONE [#A] figure out how to expose real devices to Home Assistant
+Had to emit an identifier per output.
 * DONE [#B] Make the polling interval configurable
-
 It's now hardcoded to 500ms.
 
 Added: POLL_INTERVAL_IN_MS=500

@@ -50,15 +50,15 @@ const configManager = new ConfigManager(process.env.CONFIG_PATH || "/data/config
 /**
  * I know this is overkill.
  */
-const processor$ = combineLatest(configManager.dobissCANController$, configManager.mqtt$)
+const processor$ = combineLatest(configManager.dobissCAN$, configManager.mqtt$)
     .pipe(
-        switchMap(([ canControllerConfig, mqttConfig ]) => {
-            const canControllerIdentifier = `${DOBISS_NAMESPACE}_mqtt_${canControllerConfig.host.replace(/\./g, "_")}`;
+        switchMap(([ canConfig, mqttConfig ]) => {
+            const canIdentifier = `${DOBISS_NAMESPACE}_mqtt_${canConfig.host.replace(/\./g, "_")}`;
 
             // Create a SocketClient which will kick into gear when we need it.
             const socketClient = new SocketClient({
-                host: canControllerConfig.host,
-                port: canControllerConfig.port,
+                host: canConfig.host,
+                port: canConfig.port,
             });
 
             // Create the MQTT client which will also kick into gear when we need it.
@@ -80,7 +80,7 @@ const processor$ = combineLatest(configManager.dobissCANController$, configManag
                                     .outputs
                                     .map((output) => {
                                         const outputId = `output_${output.relay}x${output.output}`;
-                                        const id = `${canControllerIdentifier}_${outputId}`;
+                                        const id = `${canIdentifier}_${outputId}`;
 
                                         return {
                                             ...output,
@@ -92,7 +92,7 @@ const processor$ = combineLatest(configManager.dobissCANController$, configManag
                                                   ],
                                                   manufacturer: "Dobiss",
                                                   name: output.name,
-                                                  via_device: canControllerIdentifier,
+                                                  via_device: canIdentifier,
                                                },
                                                 "name": output.name,
                                                 "optimistic": false,

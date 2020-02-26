@@ -16,7 +16,7 @@ not have a permanent connection set up so that the regular dobiss app still
 works nicely alongside this service. For the moment though the socket is always
 connected. Which means that the native dobiss apps might encounter issues.
 
-It will make a *lot* of requests to your CAN controller since it'll poll for
+It will make a *lot* of requests to your CAN Programmer since it'll poll for
 the state of every relay you have.
 
 ## Config

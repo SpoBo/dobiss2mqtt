@@ -22,7 +22,7 @@ Programmer to check the state of the relay outputs.
 * DONE [#B] Add a timeout operator to the socket requests
 
 This way we will ensure we do terminate every socket request after a while. Even
-if the CAN controller is left hanging.
+if the CAN Programmer is left hanging.
 
 It will probably crash the whole process though as there is no work done for
 automatic restarting of the observables.

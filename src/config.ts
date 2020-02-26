@@ -95,10 +95,10 @@ export default class ConfigManager {
     }
 
     /**
-     * Exposes the CAN controller config.
+     * Exposes the CAN Programmer config.
      * This is just the host and the port.
      */
-    public get dobissCANController$(): Observable<IDobissConfig> {
+    public get dobissCAN$(): Observable<IDobissConfig> {
         return this.config$
             .pipe(
                 map((config) => {

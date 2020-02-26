@@ -1,6 +1,6 @@
 {
     "name": "dobiss2mqtt",
-    "description": "Connect your Dobiss CAN Controller to MQTT",
+    "description": "Connect your Dobiss installation to MQTT",
     "version": "0.1.0",
     "author": "Vincent De Snerck <vincent@supervillain.be>",
     "license": "MIT",

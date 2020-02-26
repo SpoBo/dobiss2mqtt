@@ -22,6 +22,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Expose the data volume in which we will look for the config file
+VOLUME ["/data"]
+
 ## Copy the necessary files form builder
 COPY --from=builder "/app/dist/" "/app/dist/"
 COPY --from=builder "/app/node_modules/" "/app/node_modules/"

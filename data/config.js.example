@@ -1,3 +1,5 @@
+// NOTE: This can also be a JSON file if you prefer. All node cares about is that it eventually receives a JS object from the file with the configuration on it.
+
 module.exports = {
     dobiss: {
         // NOTE: this whole object maps to the first argument of socketInstance.connect

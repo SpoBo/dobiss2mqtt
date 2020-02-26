@@ -1,7 +1,7 @@
 import DEBUG from "debug";
 import { Socket, SocketConnectOpts } from "net";
 import { fromEvent, Observable, Subject } from "rxjs";
-import { concatMap, share, shareReplay, switchMap, take, tap } from "rxjs/operators";
+import { concatMap, share, shareReplay, switchMap, take, tap, timeout } from "rxjs/operators";
 import { convertBufferToByteArray } from "./helpers";
 
 const debug = DEBUG("dobiss2mqtt.socket");
@@ -26,6 +26,7 @@ export default class SocketClient {
                         const done$ = (fromEvent(socket, "data") as Observable<Buffer>)
                             .pipe(
                                 take(1),
+                                timeout(5000),
                                 tap({
                                     next(output: Buffer) {
                                         const byteArray = convertBufferToByteArray(output);

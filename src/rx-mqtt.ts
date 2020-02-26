@@ -30,8 +30,8 @@ export class RxMqtt {
                         .pipe(
                             filter(([ incomingTopic ]) => incomingTopic === topic),
                             tap({
-                                next(d) {
-                                    debug("message response for %s is %o", topic, d);
+                                next(out) {
+                                    debug("message response for %s is %o", topic, out);
                                 },
                             }),
                             map(([ _, buffer ]) => buffer.toString()),
@@ -72,24 +72,24 @@ function client (url: string): Observable<ISimplifiedMqttClient> {
             subscriber.next({
                 message$: fromEvent(client, "message"),
                 publish$: ({ topic, payload }: { topic: string, payload: string | Buffer }) => {
-                    return new Observable((subscriber) => {
+                    return new Observable((publishSubscriber) => {
                         client.publish(topic, payload, (err) => {
                             if (err) {
-                                subscriber.error(err);
+                                publishSubscriber.error(err);
                             }
 
-                            subscriber.complete();
+                            publishSubscriber.complete();
                         });
                     });
                 },
                 subscribe$: ({ topic }: { topic: string }) => {
-                    return new Observable((subscriber) => {
+                    return new Observable((subscribeSubscriber) => {
                         client.subscribe(topic, (err) => {
                             if (err) {
-                                subscriber.error(err);
+                                subscribeSubscriber.error(err);
                             }
 
-                            subscriber.complete();
+                            subscribeSubscriber.complete();
                         });
                     });
                 },

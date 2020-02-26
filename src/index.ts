@@ -30,6 +30,8 @@ import { RxMqtt } from "./rx-mqtt";
 import ConfigManager, { IRelayOutputConfig } from "./config";
 import { convertBufferToByteArray } from "./helpers";
 
+const POLL_INTERVAL_IN_MS = Number(process.env.POLL_INTERVAL_IN_MS) || 500;
+
 enum ACTION_TYPES {
     toggle,
     on,
@@ -41,12 +43,10 @@ const debug = DEBUG("dobiss2mqtt.index");
 
 // This preps the config and moves it into several observables.
 // As soon as the config changes and it impacts this part of the config it will emit a new value.
-const configManager = new ConfigManager(process.env.CONFIG_PATH || "../config");
+const configManager = new ConfigManager(process.env.CONFIG_PATH || "/data/config");
 
 /**
  * I know this is overkill.
- *
- * But now we will not need to restart the service when the config changes :p
  */
 const processor$ = combineLatest(configManager.dobissCANController$, configManager.mqtt$)
     .pipe(
@@ -157,7 +157,7 @@ const processor$ = combineLatest(configManager.dobissCANController$, configManag
                                         }),
                                 );
 
-                                const periodicallyRequest$ = interval(500);
+                                const periodicallyRequest$ = interval(POLL_INTERVAL_IN_MS);
 
                                 const manualPing$ = new Subject();
 
@@ -250,7 +250,10 @@ const processor$ = combineLatest(configManager.dobissCANController$, configManag
                     }),
                 );
 
-            return merge(socketClient.consume$, relays$);
+            return merge(
+                socketClient.consume$,
+                relays$,
+            );
         }),
     );
 
@@ -258,7 +261,10 @@ processor$
     .subscribe({
         error(e) {
             console.error("ERROR %o", e);
-            process.exit(1);
+            // 5s cooldown after crash to not spam everything should the process be restarted immediately.
+            setTimeout(() => {
+                process.exit(1);
+            }, 5000);
         },
         complete() {
             debug("completed processor");

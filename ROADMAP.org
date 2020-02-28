@@ -24,7 +24,7 @@ It's now hardcoded to 500ms.
 Added: POLL_INTERVAL_IN_MS=500
 * TODO [#B] Set up some testing
 Normally I test but it is a bit of a pain with RxJS.
-* TODO [#B] finetune socket management to give breathing room to other users of the socket
+* DONE [#B] finetune socket management to give breathing room to other users of the socket
 I notice that a single CAN Programmer can only have a single active socket
 session. The Dobiss app also uses a socket connection to check the states of the
 lights. So it's important to not hog the socket connection if it's not needed.
@@ -41,6 +41,12 @@ automatic restarting of the observables.
 But that's probably not a bad thing. If the socket is not working your docker
 process shouldn't pretend to be stable.
 * TODO [#C] add authentication for mqtt
+* TODO [#A] check to support Evolution X protocol
+And thus allowing configuring different protocols.
+I can create a kind of facade which has the exact same API for both protocols.
+index.ts just consumes whichever one is configured.
+
+Will need some refactoring for this first.
 * look into dimmers supported by dobiss
 * [#A] look into switches
 I'll probably have to hook hardware into the TCP loops for the switches. Then I

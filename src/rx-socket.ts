@@ -1,7 +1,20 @@
 import DEBUG from "debug";
+
 import { Socket, SocketConnectOpts } from "net";
+
 import { fromEvent, Observable, Subject } from "rxjs";
-import { concatMap, share, shareReplay, switchMap, take, tap, timeout } from "rxjs/operators";
+
+import {
+    concatMap,
+    publishReplay,
+    refCount,
+    share,
+    switchMap,
+    take,
+    tap,
+    timeout,
+} from "rxjs/operators";
+
 import { convertBufferToByteArray } from "./helpers";
 
 const debug = DEBUG("dobiss2mqtt.socket");
@@ -121,9 +134,11 @@ function socket (opts: SocketConnectOpts): Observable<Socket> {
         };
     })
     .pipe(
-        // This hacky stuff is needed because of TypeScript.
-        // Can this be fixed ?
-        // In any case shareReplay is needed otherwise we thrash the socket after our first connection.
-        (v) => shareReplay(1)(v) as Observable<Socket>,
+        // NOTE: We can also keep the socket online between requests by doing shareReplay(1) instead of publishReplay(1)
+        //       This is interesting for people who don't care about the rest of the dobiss apps working.
+        // NOTE: This hacky stuff `(v) => xx as Observable<Socket>` is needed because of TypeScript.
+        //       Can this be fixed ?
+        (v) => publishReplay(1)(v) as Observable<Socket>,
+        refCount(),
     );
 }

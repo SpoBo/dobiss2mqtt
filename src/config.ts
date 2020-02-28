@@ -131,7 +131,7 @@ const CONVICT_SCHEMA = {
     },
 
     pollIntervalInMs: {
-        default: 500,
+        default: 1000,
         doc: "How many milliseconds do we delay between every poll of every pollable module.",
         env: "POLL_INTERVAL_IN_MS",
         format: "nat",

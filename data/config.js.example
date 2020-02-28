@@ -10,7 +10,7 @@ module.exports = {
         //       I prefer something which just maps 1:1.
         url: 'mqtt://host' // MQTT_URL
     },
-    pollIntervalInMs: 500, // POLL_INTERVAL_IN_MS
+    pollIntervalInMs: 1000, // POLL_INTERVAL_IN_MS
     modules: [
         {
             // For now only "relay" works. So we can only turn outputs on or off.

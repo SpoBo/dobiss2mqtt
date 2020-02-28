@@ -7,14 +7,17 @@ import {
     interval,
     merge,
     Subject,
+    timer,
 } from "rxjs";
 
 import {
+    catchError,
     distinctUntilChanged,
     groupBy,
     map,
     mergeMap,
     switchMap,
+    switchMapTo,
     tap,
 } from "rxjs/operators";
 
@@ -56,6 +59,8 @@ const processor$ = combineLatest(
     )
     .pipe(
         switchMap(([ canConfig, mqttConfig, pollInterval ]) => {
+            debug("polling interval is %d", pollInterval);
+
             const canIdentifier = `${DOBISS_NAMESPACE}_mqtt_${canConfig.host.replace(/\./g, "_")}`;
 
             // Create a SocketClient which will kick into gear when we need it.
@@ -160,6 +165,7 @@ const processor$ = combineLatest(
                                                                             .next("manual");
                                                                     },
                                                                 }),
+                                                                // TODO: retry mechanism here
                                                             );
                                                     }),
                                                 );
@@ -201,8 +207,8 @@ const processor$ = combineLatest(
                                                             .filter((v) => v);
 
                                                         return from(combined);
-                                                    },
-                                                ));
+                                                    }),
+                                                );
                                         }),
                                     );
 
@@ -271,14 +277,15 @@ const processor$ = combineLatest(
     );
 
 processor$
+    .pipe(
+        catchError((e, obs$) => {
+            console.error(e);
+
+            return timer(5000)
+                .pipe(switchMapTo(obs$));
+        }),
+    )
     .subscribe({
-        error(e) {
-            console.error("ERROR %o", e);
-            // 5s cooldown after crash to not spam everything should the process be restarted immediately.
-            setTimeout(() => {
-                process.exit(1);
-            }, 5000);
-        },
         complete() {
             debug("completed processor");
         },

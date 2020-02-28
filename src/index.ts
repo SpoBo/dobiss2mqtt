@@ -174,7 +174,7 @@ const processor$ = combineLatest(
                                     .pipe(
                                         switchMap(() => {
                                             return socketClient
-                                                .send(createPingForState({ relais: module.address }))
+                                                .send(createPingForState({ moduleAddress: module.address }))
                                                 .pipe(
                                                     switchMap((response) => {
                                                         const byteArray = convertBufferToByteArray(response);

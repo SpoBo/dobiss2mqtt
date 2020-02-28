@@ -6,12 +6,18 @@ const HEADER_DEFAULTS = {
     rowCount: 1,
 };
 
+const MODULE_TYPE = {
+    "0-10v": 18,
+    "dimmer": 10,
+    "relay": 8,
+};
+
 // A header is a 16bit buffer, Delimited by 175 for start and end.
-function createHeaderPayload (options: { code: number, type: number, relais: number, colDataCount?: number }) {
+function createHeaderPayload (options: { code: number, type: number, moduleAddress: number, colDataCount?: number }) {
     const {
         code,
         type,
-        relais,
+        moduleAddress,
         high,
         low,
         colMaxCount,
@@ -23,7 +29,7 @@ function createHeaderPayload (options: { code: number, type: number, relais: num
         175,
         code,
         type,
-        relais,
+        moduleAddress,
         high,
         low,
         colMaxCount,
@@ -44,25 +50,25 @@ function createHeaderPayload (options: { code: number, type: number, relais: num
  * @param {number} type
  * @param {number} address
  */
-function createActionHeaderPayload (options: { type: number, relais: number }) {
-    return createHeaderPayload({ type: options.type, relais: options.relais, code: 2 });
+function createActionHeaderPayload (options: { type: number, moduleAddress: number }) {
+    return createHeaderPayload({ type: options.type, moduleAddress: options.moduleAddress, code: 2 });
 }
-function createSimpleActionBuffer(options: { relais: number, output: number, action: number }): Buffer {
-    return Buffer.from([options.relais, options.output, options.action, 255, 255, 64, 255, 255]);
+function createSimpleActionBuffer(options: { moduleAddress: number, outputAddress: number, action: number }): Buffer {
+    return Buffer.from([options.moduleAddress, options.outputAddress, options.action, 255, 255, 64, 255, 255]);
 }
 
-export function createRelayAction(relais: number, output: number, action: number) {
+export function createRelayAction(moduleAddress: number, outputAddress: number, action: number) {
     const header = createActionHeaderPayload(
         {
             type: 8,
-            relais,
+            moduleAddress,
         },
     );
 
     const body = createSimpleActionBuffer(
         {
-            relais,
-            output,
+            moduleAddress,
+            outputAddress,
             action,
         },
     );
@@ -70,11 +76,11 @@ export function createRelayAction(relais: number, output: number, action: number
     return Buffer.concat([ header, body ]);
 }
 
-export function createPingForState ({ relais }: { relais: number }) {
+export function createPingForState ({ moduleAddress }: { moduleAddress: number }) {
     return createHeaderPayload({
         code: 1,
         colDataCount: 0, // don't know why it needs to be 0 for data. maybe to allow a bigger response?
-        relais,
+        moduleAddress,
         type: 8, // don't know what 8 is ... .
     });
 }

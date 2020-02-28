@@ -1,3 +1,8 @@
+enum HEADER_TYPE_CODE {
+    action = 2,
+    poll = 1,
+}
+
 const HEADER_DEFAULTS = {
     colDataCount: 8,
     colMaxCount: 8,
@@ -6,17 +11,24 @@ const HEADER_DEFAULTS = {
     rowCount: 1,
 };
 
-const MODULE_TYPE = {
-    "0-10v": 18,
-    "dimmer": 10,
-    "relay": 8,
+enum MODULE_TYPE {
+    "0-10v" = 18,
+    "dimmer" = 10,
+    "relay" = 8,
+};
+
+type HeaderPayloadOptions = {
+    code: HEADER_TYPE_CODE,
+    moduleType: MODULE_TYPE,
+    moduleAddress: number,
+    colDataCount?: number,
 };
 
 // A header is a 16bit buffer, Delimited by 175 for start and end.
-function createHeaderPayload (options: { code: number, type: number, moduleAddress: number, colDataCount?: number }) {
+function createHeaderPayload (options: HeaderPayloadOptions) {
     const {
         code,
-        type,
+        moduleType,
         moduleAddress,
         high,
         low,
@@ -25,36 +37,48 @@ function createHeaderPayload (options: { code: number, type: number, moduleAddre
         colDataCount,
     } = { ...HEADER_DEFAULTS, ...options };
 
-    return Buffer.from([
-        175,
-        code,
-        type,
-        moduleAddress,
-        high,
-        low,
-        colMaxCount,
-        rowCount,
+    return Buffer
+        .from([
+            175,
+            code,
+            moduleType,
+            moduleAddress,
+            high,
+            low,
+            colMaxCount,
+            rowCount,
 
-        colDataCount,
-        255,
-        255,
-        255,
-        255,
-        255,
-        255,
-        175,
-    ]);
+            colDataCount,
+            255,
+            255,
+            255,
+            255,
+            255,
+            255,
+            175,
+        ]);
 }
 
-/**
- * @param {number} type
- * @param {number} address
- */
 function createActionHeaderPayload (options: { type: number, moduleAddress: number }) {
-    return createHeaderPayload({ type: options.type, moduleAddress: options.moduleAddress, code: 2 });
+    return createHeaderPayload({
+        code: HEADER_TYPE_CODE.action,
+        moduleAddress: options.moduleAddress,
+        moduleType: options.type,
+    });
 }
+
 function createSimpleActionBuffer(options: { moduleAddress: number, outputAddress: number, action: number }): Buffer {
-    return Buffer.from([options.moduleAddress, options.outputAddress, options.action, 255, 255, 64, 255, 255]);
+    return Buffer
+        .from([
+            options.moduleAddress,
+            options.outputAddress,
+            options.action,
+            255, // delay on
+            255, // delay off
+            64, // dimmer (64 = 100%)
+            255, // dimmer speed
+            255, // not used
+        ]);
 }
 
 export function createRelayAction(moduleAddress: number, outputAddress: number, action: number) {
@@ -76,11 +100,11 @@ export function createRelayAction(moduleAddress: number, outputAddress: number, 
     return Buffer.concat([ header, body ]);
 }
 
-export function createPingForState ({ moduleAddress }: { moduleAddress: number }) {
+export function createPingForState ({ moduleAddress, moduleType }: { moduleAddress: number, moduleType: MODULE_TYPE }) {
     return createHeaderPayload({
-        code: 1,
-        colDataCount: 0, // don't know why it needs to be 0 for data. maybe to allow a bigger response?
+        code: HEADER_TYPE_CODE.poll,
+        colDataCount: 0,
         moduleAddress,
-        type: 8, // don't know what 8 is ... .
+        moduleType,
     });
 }

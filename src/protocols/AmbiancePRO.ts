@@ -68,11 +68,6 @@ export default class AmbiancePRO implements IDobissProtocol {
         return this.action(module, output, ACTION_TYPES.on);
     }
 
-    public dim (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, brightness: number): Observable<null> {
-        // TODO: Throw ? Hook up to just on ? Should we somehow indicate that it is not dimmable ?
-        return of(null);
-    }
-
     public pollModule (module: IDobiss2MqttModule): Observable<IOutputState> {
         const requestBufffer = createHeaderPayload({
             code: HEADER_TYPE_CODE.poll,
@@ -213,6 +208,6 @@ function convertModuleTypeToNumber(moduleType: ModuleType): number {
         case ModuleType.volt:
             return 18;
         default:
-            throw new Error('Unmapped ModuleType');
+            throw new Error("Unmapped ModuleType");
     }
 }

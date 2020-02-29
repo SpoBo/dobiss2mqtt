@@ -19,7 +19,7 @@ export interface IDobissProtocol {
 
     off: (module: IDobiss2MqttModule, output: IDobiss2MqttOutput) => Observable<null>;
 
-    dim: (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, brightess: number) => Observable<null>;
+    dim?: (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, brightess: number) => Observable<null>;
 
     pollModule: (module: IDobiss2MqttModule) => Observable<IOutputState>;
 

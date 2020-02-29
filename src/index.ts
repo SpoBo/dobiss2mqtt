@@ -3,9 +3,9 @@ import DEBUG from "debug";
 import {
     combineLatest,
     empty,
-    from,
     interval,
     merge,
+    of,
     Subject,
     timer,
 } from "rxjs";
@@ -18,29 +18,18 @@ import {
     mergeMap,
     switchMap,
     switchMapTo,
+    take,
     tap,
 } from "rxjs/operators";
-
-import {
-    createPingForState,
-    createRelayAction,
-} from "./dobiss";
-
-import SocketClient from "./rx-socket";
 
 import { RxMqtt } from "./rx-mqtt";
 
 import ConfigManager, { ModuleType } from "./config";
-import { convertBufferToByteArray } from "./helpers";
+import dobissSelector from "./dobissSelector";
+
+import SocketClient from "./rx-socket";
 
 const DOBISS_NAMESPACE = "dobiss";
-
-enum ACTION_TYPES {
-    toggle,
-    on,
-    off,
-    poll,
-}
 
 const debug = DEBUG("dobiss2mqtt.index");
 
@@ -58,23 +47,21 @@ const processor$ = combineLatest(
         configManager.pollInterval$,
     )
     .pipe(
-        switchMap(([ canConfig, mqttConfig, pollInterval ]) => {
+        switchMap(([ dobissConfig, mqttConfig, pollInterval ]) => {
             debug("polling interval is %d", pollInterval);
 
-            const canIdentifier = `${DOBISS_NAMESPACE}_mqtt_${canConfig.host.replace(/\./g, "_")}`;
+            const canIdentifier = `${DOBISS_NAMESPACE}_mqtt_${dobissConfig.host.replace(/\./g, "_")}`;
 
             // Create a SocketClient which will kick into gear when we need it.
             const socketClient = new SocketClient({
-                host: canConfig.host,
-                port: canConfig.port,
+                host: dobissConfig.host,
+                port: dobissConfig.port,
             });
+
+            const dobiss = dobissSelector(dobissConfig, socketClient);
 
             // Create the MQTT client which will also kick into gear when we need it.
             const mqttClient = new RxMqtt(mqttConfig.url);
-
-            function createId (output: string, ip: string) {
-                return `dobiss_mqtt__${output}`;
-            }
 
             const relaysWithMQTTConfig$ = configManager
                 .modules$
@@ -138,24 +125,13 @@ const processor$ = combineLatest(
                                                         return { request: JSON.parse(request) };
                                                     }),
                                                     switchMap(({ request }) => {
-                                                        const type = request.state === "ON"
+                                                        const action$ = request.state === "ON"
                                                             ?
-                                                            ACTION_TYPES.on
+                                                            dobiss.on(module, output)
                                                             :
-                                                            ACTION_TYPES.off;
+                                                            dobiss.off(module, output);
 
-                                                        const buffer = createRelayAction(
-                                                            module.address,
-                                                            output.address,
-                                                            type,
-                                                        );
-
-                                                        if (!buffer) {
-                                                            return empty();
-                                                        }
-
-                                                        return socketClient
-                                                            .send(buffer)
+                                                        return action$
                                                             .pipe(
                                                                 tap({
                                                                     next() {
@@ -179,36 +155,7 @@ const processor$ = combineLatest(
                                 const polls$ = merge(periodicallyRequest$, manualPing$)
                                     .pipe(
                                         switchMap(() => {
-                                            return socketClient
-                                                .send(createPingForState({ moduleAddress: module.address }))
-                                                .pipe(
-                                                    switchMap((response) => {
-                                                        const byteArray = convertBufferToByteArray(response);
-                                                        const startBit = 4 * 8;
-                                                        const states = byteArray.slice(startBit, startBit + 12);
-
-                                                        const combined = states
-                                                            .map((state, index) => {
-                                                                const output = module
-                                                                    .outputs
-                                                                    .find((outputItem) => {
-                                                                        return outputItem.address === index;
-                                                                    });
-
-                                                                if (!output) {
-                                                                    return null;
-                                                                }
-
-                                                                return {
-                                                                    config: output.config,
-                                                                    state,
-                                                                };
-                                                            })
-                                                            .filter((v) => v);
-
-                                                        return from(combined);
-                                                    }),
-                                                );
+                                            return dobiss.pollModule(module);
                                         }),
                                     );
 
@@ -216,26 +163,52 @@ const processor$ = combineLatest(
                                     .pipe(
                                         // Create an observable per unique_id and monitor a change in state
                                         // for every output in order to push it to mqtt.
-                                        groupBy((v) => v?.config?.unique_id),
+                                        groupBy((v) => v.output.address),
                                         mergeMap((states$) => {
-                                            return states$
+                                            const address$ = states$
+                                                .pipe(
+                                                    map((state) => state.output.address),
+                                                    take(1),
+                                                );
+
+                                            const outputForAddress$ = address$
+                                                .pipe(
+                                                    switchMap((address) => {
+                                                        const output = module
+                                                            .outputs
+                                                            .find((outputWithConfig) => outputWithConfig.address === address);
+
+                                                        if (!output) {
+                                                            return empty();
+                                                        }
+
+                                                        return of(output);
+                                                    }),
+                                                );
+
+                                            const latestState$ = states$
                                                 .pipe(
                                                     // Only continue when the state effectively changed.
                                                     distinctUntilChanged((a, b) => {
-                                                        return a?.state === b?.state;
+                                                        return a.powered === b.powered;
                                                     }),
-                                                    switchMap((update) => {
+                                                );
+
+                                            return combineLatest(latestState$, outputForAddress$)
+                                                .pipe(
+                                                    switchMap(([ update, output ]) => {
                                                         if (!update) {
                                                             return empty();
                                                         }
 
                                                         const payload = JSON.stringify({
-                                                            state: update?.state ? "ON" : "OFF",
+                                                            state: update.powered ? "ON" : "OFF",
                                                         });
 
                                                         return mqttClient
                                                             .publish$(
-                                                                update.config.stat_t.replace("~", update.config["~"]),
+                                                                // TODO: get the configured url for the endpoint.
+                                                                output.config.stat_t.replace("~", output.config["~"]),
                                                                 payload,
                                                                 {
                                                                     qos: 1,

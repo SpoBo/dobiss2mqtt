@@ -72,7 +72,8 @@ export default class SX implements IDobissProtocol {
         return this.action(module, output, ACTION_TYPES.on);
     }
 
-    // TODO: add ability to dim
+    // TODO: add ability to dim. in that case we set the third argument to a value of 255 relative from 1 to 100.
+    //       I wonder if reading the states will also tell how bright the lights are.
 
     public pollModule (module: IDobiss2MqttModule): Observable<IOutputState> {
         // We need to prefix this.

@@ -2,7 +2,6 @@ import {
     concat,
     from,
     Observable,
-    of,
 } from "rxjs";
 
 import {
@@ -10,7 +9,7 @@ import {
     switchMap,
 } from "rxjs/operators";
 
-import SocketClient from "../rx-socket";
+import RxSocket from "../rx-socket";
 
 import {
     IDobiss2MqttModule,
@@ -27,15 +26,38 @@ import {
 } from "../helpers";
 
 enum ACTION_TYPES {
-    on = 1,
-    off = 0,
+    on = 0x01,
+    off = 0x00,
+}
+
+function convertModuleToModuleId(module: IDobiss2MqttModule) {
+    return module.address + 40;
+}
+
+function createOutputsBuffer({ batch, moduleId }: { batch: IDobiss2MqttOutput[]; moduleId: number }): Buffer {
+    // If there are not 24 modules we need to padd up the rest with 0xFF
+    // So let's make sure we pad it if the batch is too small.
+    return Buffer
+        .from(new Array(24)
+        .map((_, index) => {
+            const output = batch[index];
+
+            if (output) {
+                return output.address;
+            }
+
+            return 0xFF;
+        })
+        .reduce((acc, item) => {
+            return acc.concat([ moduleId, item ]);
+        }, [] as number[]));
 }
 
 export default class AmbiancePRO implements IDobissProtocol {
 
-    private socketClient: SocketClient;
+    private socketClient: RxSocket;
 
-    constructor({ socketClient }: { socketClient: SocketClient }) {
+    constructor({ socketClient }: { socketClient: RxSocket }) {
         this.socketClient = socketClient;
     }
 
@@ -46,6 +68,9 @@ export default class AmbiancePRO implements IDobissProtocol {
     public on (module: IDobiss2MqttModule, output: IDobiss2MqttOutput): Observable<null> {
         return this.action(module, output, ACTION_TYPES.on);
     }
+
+    // TODO: add ability to dim
+
     public pollModule (module: IDobiss2MqttModule): Observable<IOutputState> {
         // We need to prefix this.
         const baseBuffer = Buffer
@@ -94,7 +119,7 @@ export default class AmbiancePRO implements IDobissProtocol {
             const requestBuffer = Buffer.concat([ baseBuffer, outputsBuffer ]);
 
             return this.socketClient
-                .send(requestBuffer)
+                .request(requestBuffer)
                 .pipe(
                     switchMap((response) => {
                         const states = convertBufferToByteArray(response);
@@ -152,32 +177,9 @@ export default class AmbiancePRO implements IDobissProtocol {
             ]);
 
         return this.socketClient
-            .send(buffer)
+            .request(buffer)
             .pipe(
                 mapTo(null),
             );
     }
-}
-
-function convertModuleToModuleId(module: IDobiss2MqttModule) {
-    return module.address + 40;
-}
-
-function createOutputsBuffer({ batch, moduleId }: { batch: IDobiss2MqttOutput[], moduleId: number }): Buffer {
-    // If there are not 24 modules we need to padd up the rest with 0xFF
-    // So let's make sure we pad it if the batch is too small.
-    return Buffer
-        .from(new Array(24)
-        .map((item, index) => {
-            const output = batch[index];
-
-            if (output) {
-                return output.address;
-            }
-
-            return 0xFF;
-        })
-        .reduce((acc, item) => {
-            return acc.concat([ moduleId, item ]);
-        }, [] as number[]));
 }

@@ -8,7 +8,7 @@ import {
     switchMap,
 } from "rxjs/operators";
 
-import SocketClient from "../rx-socket";
+import { IRequestResponseBuffer } from "../rx-socket";
 
 import {
     IDobiss2MqttModule,
@@ -127,12 +127,11 @@ function createActionHeaderPayload (options: { moduleType: ModuleType; moduleAdd
     });
 }
 
-
 export default class AmbiancePRO implements IDobissProtocol {
 
-    private socketClient: SocketClient;
+    private socketClient: IRequestResponseBuffer;
 
-    constructor({ socketClient }: { socketClient: SocketClient }) {
+    constructor({ socketClient }: { socketClient: IRequestResponseBuffer }) {
         this.socketClient = socketClient;
     }
 
@@ -153,11 +152,12 @@ export default class AmbiancePRO implements IDobissProtocol {
         });
 
         return this.socketClient
-            .send(requestBufffer)
+            .request(requestBufffer)
             .pipe(
                 switchMap((response) => {
                     const byteArray = convertBufferToByteArray(response);
                     const startBit = 4 * 8;
+
                     const states = byteArray.slice(startBit, startBit + 12);
 
                     const combined = states
@@ -204,7 +204,7 @@ export default class AmbiancePRO implements IDobissProtocol {
         const buffer = Buffer.concat([ header, body ]);
 
         return this.socketClient
-            .send(buffer)
+            .request(buffer)
             .pipe(
                 mapTo(null),
             );

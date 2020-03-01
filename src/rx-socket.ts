@@ -19,7 +19,17 @@ import socket from "./socket"
 
 const debug = DEBUG("dobiss2mqtt.rx-socket");
 
-export default class SocketClient {
+/**
+ * This is a basic interface which determines that the object can send a request buffer
+ * and is expected to receive a response buffer for that request.
+ *
+ * The full RxSocket API is not really needed for the dobiss protocols.
+ */
+export interface IRequestResponseBuffer {
+    request(input: Buffer): Observable<Buffer>;
+}
+
+export default class RxSocket implements IRequestResponseBuffer {
     private socket$: Observable<Socket>;
 
     private queue: Subject<Observable<Buffer>>;
@@ -29,7 +39,7 @@ export default class SocketClient {
         this.socket$ = socket(opts);
     }
 
-    public send(input: Buffer): Observable<Buffer> {
+    public request(input: Buffer): Observable<Buffer> {
         return new Observable((subscriber) => {
             const send$ = this.socket$
                 .pipe(

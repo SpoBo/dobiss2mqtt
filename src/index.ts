@@ -27,7 +27,7 @@ import { RxMqtt } from "./rx-mqtt";
 import ConfigManager, { ModuleType } from "./config";
 import dobissSelector from "./dobissSelector";
 
-import SocketClient from "./rx-socket";
+import RxSocket from "./rx-socket";
 
 const DOBISS_NAMESPACE = "dobiss";
 
@@ -53,7 +53,7 @@ const processor$ = combineLatest(
             const canIdentifier = `${DOBISS_NAMESPACE}_mqtt_${dobissConfig.host.replace(/\./g, "_")}`;
 
             // Create a SocketClient which will kick into gear when we need it.
-            const socketClient = new SocketClient({
+            const socketClient = new RxSocket({
                 host: dobissConfig.host,
                 port: dobissConfig.port,
             });

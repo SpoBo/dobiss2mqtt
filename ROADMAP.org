@@ -22,7 +22,7 @@ Had to emit an identifier per output.
 It's now hardcoded to 500ms.
 
 Added: POLL_INTERVAL_IN_MS=500
-* TODO [#B] Set up some testing
+* DONE [#B] Set up some testing
 Normally I test but it is a bit of a pain with RxJS.
 * DONE [#B] finetune socket management to give breathing room to other users of the socket
 I notice that a single CAN Programmer can only have a single active socket
@@ -95,3 +95,7 @@ Can it be done through CAN Programmer ?
 Can it be done through CAN Programmer ?
 * Support Moods
 Can it be done through CAN Programmer ?
+
+I see that it is module of address 0x53 for Dobiss SX.
+Maybe it can also be used to poll the moods ? Although it kind of just turns on
+and the state is not really kept.

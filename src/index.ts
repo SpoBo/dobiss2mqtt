@@ -128,6 +128,7 @@ const processor$ = combineLatest(
                                                         return { request: JSON.parse(request) };
                                                     }),
                                                     switchMap(({ request }) => {
+                                                        debug('request to set state to %s for module %d and output %d', request.state, module.address, output.address)
                                                         const action$ = request.state === "ON"
                                                             ?
                                                             dobiss.on(module, output)
@@ -138,6 +139,7 @@ const processor$ = combineLatest(
                                                             .pipe(
                                                                 tap({
                                                                     next() {
+                                                                        debug('completed request to set state to %s for module %d and output %d (%s)', request.state, module.address, output.address, output.name)
                                                                         // As a side-effect,
                                                                         // trigger a manual ping on success.
                                                                         manualPing$
@@ -156,7 +158,9 @@ const processor$ = combineLatest(
                                 const polls$ = merge(periodicallyRequest$, manualPing$)
                                     .pipe(
                                         switchMap(() => {
-                                            return dobiss.pollModule(module);
+                                            debug('start polling module %d', module.address)
+                                            return dobiss
+                                                .pollModule(module);
                                         }),
                                     );
 
@@ -192,6 +196,11 @@ const processor$ = combineLatest(
                                                     // Only continue when the state effectively changed.
                                                     distinctUntilChanged((a, b) => {
                                                         return a.powered === b.powered;
+                                                    }),
+                                                    tap({
+                                                        next(a) {
+                                                            debug('detected change of powered state to %s for module %d and output %d (%s)', a.powered, module.address, a.output.address, a.output.name)
+                                                        }
                                                     }),
                                                 );
 

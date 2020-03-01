@@ -6,17 +6,16 @@
     "license": "MIT",
     "main": "dist/main.js",
     "scripts": {
-        "lint": "tslint src/*",
+        "lint": "eslint -c .eslintrc.js --ext ts src/",
         "build": "tsc",
         "validate": "npm run build && npm run lint",
-        "start": "DEBUG=* CONFIG_PATH=./data/config.js ts-node-dev --cls --ignore-watch ./data/ -- ./src/index.ts",
+        "start": "CONFIG_PATH=./data/config.js ts-node-dev --cls --ignore-watch ./data/ -- ./src/index.ts",
         "start:prod": "NODE_ENV=production node ./dist/index.js"
     },
     "volta": {
         "node": "13.9.0"
     },
     "dependencies": {
-        "@types/debug": "^4.1.5",
         "convict": "^5.2.0",
         "debug": "^4.1.1",
         "mqtt": "^3.0.0",
@@ -24,11 +23,16 @@
     },
     "devDependencies": {
         "@types/convict": "^4.2.1",
+        "@types/debug": "^4.1.5",
+        "@types/jest": "^25.1.3",
         "@types/mqtt": "^2.5.0",
         "@types/node": "^13.7.7",
-        "ts-lint": "^4.5.1",
+        "@typescript-eslint/eslint-plugin": "^2.21.0",
+        "@typescript-eslint/parser": "^2.21.0",
+        "eslint": "^6.8.0",
+        "jest": "^25.1.0",
+        "ts-jest": "^25.2.1",
         "ts-node-dev": "^1.0.0-pre.44",
-        "tslint-microsoft-contrib": "^6.2.0",
         "typescript": "^3.8.3"
     },
     "optionalDependencies": {}

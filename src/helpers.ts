@@ -1,6 +1,6 @@
-export function convertBufferToByteArray (buffer: Buffer): Number[] {
+export function convertBufferToByteArray (buffer: Buffer): number[] {
     const hexString = buffer.toString("hex");
-    let hex = hexString.toString();
+    const hex = hexString.toString();
     const ints = [];
 
     // grab by the pairs and convert to ints

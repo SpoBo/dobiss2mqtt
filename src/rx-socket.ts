@@ -1,13 +1,9 @@
 import DEBUG from "debug";
 
-import { Socket, SocketConnectOpts } from "net";
-
 import { fromEvent, Observable, Subject } from "rxjs";
 
 import {
     concatMap,
-    publishReplay,
-    refCount,
     share,
     switchMap,
     take,
@@ -15,9 +11,13 @@ import {
     timeout,
 } from "rxjs/operators";
 
+import { Socket, SocketConnectOpts } from "net";
+
 import { convertBufferToByteArray } from "./helpers";
 
-const debug = DEBUG("dobiss2mqtt.socket");
+import socket from "./socket"
+
+const debug = DEBUG("dobiss2mqtt.rx-socket");
 
 export default class SocketClient {
     private socket$: Observable<Socket>;
@@ -86,59 +86,3 @@ export default class SocketClient {
     }
 }
 
-function socket (opts: SocketConnectOpts): Observable<Socket> {
-    return new Observable((subscriber) => {
-        debug("going to connect");
-
-        let client = new Socket();
-
-        client
-            .connect(opts);
-
-        client.on("close", () => {
-            debug("close");
-        });
-
-        client.on("data", (d) => {
-            debug("data %o", d);
-        });
-
-        client.on("drain", () => {
-            debug("drain");
-        });
-
-        client.on("end", () => {
-            debug("end");
-        });
-
-        client.on("error", (e) => {
-            debug("error", e.message);
-            subscriber.error(e);
-        });
-
-        client.on("lookup", () => {
-            debug("lookup");
-        });
-
-        client.on("timeout", () => {
-            debug("timeout");
-        });
-
-        client.on("connect", () => {
-            subscriber.next(client);
-        });
-
-        return () => {
-            debug("request for socket termination");
-            client.end();
-        };
-    })
-    .pipe(
-        // NOTE: We can also keep the socket online between requests by doing shareReplay(1) instead of publishReplay(1)
-        //       This is interesting for people who don't care about the rest of the dobiss apps working.
-        // NOTE: This hacky stuff `(v) => xx as Observable<Socket>` is needed because of TypeScript.
-        //       Can this be fixed ?
-        (v) => publishReplay(1)(v) as Observable<Socket>,
-        refCount(),
-    );
-}

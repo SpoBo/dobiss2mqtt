@@ -91,6 +91,7 @@ const processor$ = combineLatest(
                                                   ],
                                                   manufacturer: "Dobiss",
                                                   name: output.name,
+                                                  /* eslint-disable-next-line @typescript-eslint/camelcase */
                                                   via_device: canIdentifier,
                                                },
                                                 "name": output.name,
@@ -115,6 +116,8 @@ const processor$ = combineLatest(
                         // Discovery, listening to MQTT, emitting states on statechange, etc.
                         const observables = modules
                             .map((module) => {
+                                const manualPing$ = new Subject();
+
                                 const actionRequests$ = merge(
                                     ...module.outputs
                                         .map((output) => {
@@ -149,8 +152,6 @@ const processor$ = combineLatest(
                                 );
 
                                 const periodicallyRequest$ = interval(pollInterval);
-
-                                const manualPing$ = new Subject();
 
                                 const polls$ = merge(periodicallyRequest$, manualPing$)
                                     .pipe(

@@ -1,8 +1,11 @@
-import { IDobiss2MqttModule, IDobiss2MqttOutput, IDobissConfig } from "./config";
+import { IDobiss2MqttModule, IDobiss2MqttOutput, IDobissConfig, DobissInterfaceTypes } from "./config";
 
 import { Observable } from "rxjs";
-import AmbiancePRO from "./protocols/AmbiancePRO";
+
 import RxSocket from "./rx-socket";
+
+import AmbiancePRO from "./protocols/AmbiancePRO";
+import SX from "./protocols/SX";
 
 export type IOutputState = {
     output: IDobiss2MqttOutput;
@@ -29,6 +32,9 @@ export interface IDobissProtocol {
 }
 
 export default function dobissSelector(config: IDobissConfig, socketClient: RxSocket): IDobissProtocol {
-    // TODO: In the future, depending on your config, select the correct Dobiss protocol.
+    if (config.interface === DobissInterfaceTypes.sxEvolution) {
+        return new SX({ socketClient })
+    }
+
     return new AmbiancePRO({ socketClient });
 }

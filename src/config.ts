@@ -96,6 +96,12 @@ const CONVICT_SCHEMA = {
             env: "DOBISS_PORT",
             format: "port",
         },
+        interface: {
+            default: 'AMBIANCEPRO',
+            doc: "Which protocol to talk to Dobiss. AMBIANCEPRO or SXEVOLUTION.",
+            env: "DOBISS_INTERFACE",
+            format: [ "AMBIANCEPRO", "SXEVOLUTION" ],
+        },
     },
 
     modules: {
@@ -132,15 +138,21 @@ const CONVICT_SCHEMA = {
 
     pollIntervalInMs: {
         default: 1000,
-        doc: "How many milliseconds do we delay between every poll of every pollable module.",
+        doc: "How many milliseconds do we delay between every poll of every pollable module. Can also be 0.",
         env: "POLL_INTERVAL_IN_MS",
         format: "nat",
     },
 };
 
+export enum DobissInterfaceTypes {
+    ambiancePro = 'AMBIANCEPRO',
+    sxEvolution ='SXEVOLUTION',
+}
+
 export interface IDobissConfig {
     host: string;
     port: number;
+    interface: DobissInterfaceTypes
 }
 
 export interface IMqttConfig {

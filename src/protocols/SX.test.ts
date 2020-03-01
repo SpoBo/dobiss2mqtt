@@ -1,4 +1,4 @@
-import AmbiancePRO from './AmbiancePRO';
+import SX from './SX';
 
 import { IRequestResponseBuffer } from '../rx-socket';
 import { IDobiss2MqttModule, ModuleType } from '../config';
@@ -6,7 +6,7 @@ import { IDobiss2MqttModule, ModuleType } from '../config';
 import ObservableInspector from '../../test/ObservableInspector';
 import fnObservable from '../../test/fnObservable';
 
-describe("protocols/AmbiancePRO", function() {
+describe("protocols/SX", function() {
 
     describe("when we have a fake & controllable socket", function() {
         let client: IRequestResponseBuffer, clientControl: any;
@@ -58,11 +58,11 @@ describe("protocols/AmbiancePRO", function() {
 
             })
 
-            describe("when we build our AmbiancePRO instance", function() {
+            describe("when we build our SX instance", function() {
 
-                let instance: AmbiancePRO;
+                let instance: SX;
                 beforeEach(function() {
-                    instance = new AmbiancePRO({ socketClient: client })
+                    instance = new SX({ socketClient: client })
                 })
 
                 describe("when we poll the first module", function() {
@@ -81,23 +81,75 @@ describe("protocols/AmbiancePRO", function() {
                     test("it should have sent the correct request to the socket", function() {
                         expect(client.request).toHaveBeenCalledWith(
                             Buffer.from([
+                                0xED,
+                                0x63,
+                                0x30,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
                                 0xAF,
-                                0x01, // 1 for poll
-                                0x08, // 8 for relay module
-                                0x01, // 1 for module address
+                                0xAF,
+
+                                // output 1
+                                0x41,
                                 0x00,
-                                0x00,
-                                0x08,
+                                // output 2
+                                0x41,
                                 0x01,
 
-                                0x00,
+                                // filler to get to 24 outputs to check
                                 0xFF,
                                 0xFF,
                                 0xFF,
                                 0xFF,
                                 0xFF,
                                 0xFF,
-                                0xAF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF
                             ])
                         )
                     });
@@ -107,70 +159,32 @@ describe("protocols/AmbiancePRO", function() {
                             return clientControl
                                 .next(
                                     Buffer.from([
-                                        0xaf,
-                                        0x01,
-                                        0x08,
-                                        0x02,
-                                        0x00,
-                                        0x00,
-                                        0x08,
-                                        0x01,
-                                        0x00,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xaf,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
                                         0x00,
                                         0x01,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff,
-                                        0xff
+
+                                        // and the filler stuff ...
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
+                                        0xFF,
                                     ])
                                 )
                         })
@@ -195,6 +209,32 @@ describe("protocols/AmbiancePRO", function() {
                             expect(result.completed).toBeTruthy()
                         });
                     });
+
+
+                    describe("when we send a return message on the socket indicating the second output is off and the first one is on", function() {
+                        beforeEach(function() {
+                            return clientControl
+                                .next(
+                                    Buffer.from([
+                                        0x01,
+                                        0x00,
+                                    ])
+                                )
+                        })
+
+                        test("it should have returned 2 messages indicating the first one is off and the second one is on", function() {
+                            expect(result.items).toEqual([
+                                {
+                                    output: modules[0].outputs[0],
+                                    powered: true
+                                },
+                                {
+                                    output: modules[0].outputs[1],
+                                    powered: false
+                                },
+                            ])
+                        });
+                    });
                 });
 
                 describe("when we poll the second module", function() {
@@ -213,23 +253,75 @@ describe("protocols/AmbiancePRO", function() {
                     test("it should have sent the correct request to the socket", function() {
                         expect(client.request).toHaveBeenCalledWith(
                             Buffer.from([
+                                0xED,
+                                0x63,
+                                0x30,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
                                 0xAF,
-                                0x01, // 1 for poll
-                                0x10, // for dimmer module
-                                0x02, // 2 for module address
+                                0xAF,
+
+                                // output 1
+                                0x42,
                                 0x00,
-                                0x00,
-                                0x08,
+                                // output 2
+                                0x42,
                                 0x01,
 
-                                0x00,
+                                // filler to get to 24 outputs to check
                                 0xFF,
                                 0xFF,
                                 0xFF,
                                 0xFF,
                                 0xFF,
                                 0xFF,
-                                0xAF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF
                             ])
                         )
                     });
@@ -248,32 +340,26 @@ describe("protocols/AmbiancePRO", function() {
                     test("it should have sent the correct request to the socket", function() {
                         expect(client.request).toHaveBeenCalledWith(
                             Buffer.from([
-                                0xAF,
-                                0x02, // 2 for action
-                                0x08, // for relay module
-                                0x01, // 1 for module address
+                                0xED,
+                                0x43,
+                                0x31,
                                 0x00,
                                 0x00,
-                                0x08,
-                                0x01,
-
-                                0x08,
-                                0xFF,
-                                0xFF,
-                                0xFF,
-                                0xFF,
-                                0xFF,
-                                0xFF,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0xAF,
                                 0xAF,
 
-                                0x01, // module address
-                                0x01, // output address
-                                0x01, // power on
-                                0xFF, // delay on
-                                0xFF, // delay off
-                                0x40, // dimmer max
-                                0xFF, // dimmer speed
-                                0xFF
+                                0x41, // module
+                                0x01, // second output
+                                0x01, // turn on
                             ])
                         )
                     });
@@ -299,45 +385,39 @@ describe("protocols/AmbiancePRO", function() {
                     });
                 });
 
-                describe("when we ask to turn off the first output on the second module", function() {
+                describe("when we ask to turn off the first output on the first module", function() {
 
                     let result: ObservableInspector
                     beforeEach(function() {
-                        const off$ = instance
+                        const on$ = instance
                             .off(modules[1], modules[0].outputs[0])
 
-                        result = new ObservableInspector(off$)
+                        result = new ObservableInspector(on$)
                     })
 
                     test("it should have sent the correct request to the socket", function() {
                         expect(client.request).toHaveBeenCalledWith(
                             Buffer.from([
-                                0xAF,
-                                0x02, // 2 for action
-                                0x10, // for relay module
-                                0x02, // 1 for module address
+                                0xED,
+                                0x43,
+                                0x31,
                                 0x00,
                                 0x00,
-                                0x08,
-                                0x01,
-
-                                0x08,
-                                0xFF,
-                                0xFF,
-                                0xFF,
-                                0xFF,
-                                0xFF,
-                                0xFF,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0xAF,
                                 0xAF,
 
-                                0x02, // module address
-                                0x00, // output address
-                                0x00, // power off
-                                0xFF, // delay on
-                                0xFF, // delay off
-                                0x40, // dimmer max
-                                0xFF, // dimmer speed
-                                0xFF
+                                0x42, // second module
+                                0x00, // first output
+                                0x00, // turn off
                             ])
                         )
                     });
@@ -353,4 +433,3 @@ describe("protocols/AmbiancePRO", function() {
         });
     });
 });
-

@@ -44,12 +44,9 @@ const configManager = new ConfigManager(process.env.CONFIG_PATH || "/data/config
 const processor$ = combineLatest(
         configManager.dobiss$,
         configManager.mqtt$,
-        configManager.pollInterval$,
     )
     .pipe(
-        switchMap(([ dobissConfig, mqttConfig, pollInterval ]) => {
-            debug("polling interval is %d", pollInterval);
-
+        switchMap(([ dobissConfig, mqttConfig ]) => {
             const canIdentifier = `${DOBISS_NAMESPACE}_mqtt_${dobissConfig.host.replace(/\./g, "_")}`;
 
             // Create a SocketClient which will kick into gear when we need it.
@@ -153,7 +150,19 @@ const processor$ = combineLatest(
                                         }),
                                 );
 
-                                const periodicallyRequest$ = interval(pollInterval);
+
+                                const periodicallyRequest$ = configManager.pollInterval$
+                                    .pipe(
+                                        switchMap((pollInterval) => {
+                                            if (!pollInterval) {
+                                                debug("polling disabled")
+                                                return empty()
+                                            }
+
+                                            debug("polling interval is %d", pollInterval);
+                                            return interval(pollInterval)
+                                        })
+                                    );
 
                                 const polls$ = merge(periodicallyRequest$, manualPing$)
                                     .pipe(

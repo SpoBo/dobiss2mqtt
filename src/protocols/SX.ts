@@ -9,7 +9,7 @@ import {
     switchMap,
 } from "rxjs/operators";
 
-import RxSocket from "../rx-socket";
+import RxSocket, { IRequestResponseBuffer } from "../rx-socket";
 
 import {
     IDobiss2MqttModule,
@@ -31,33 +31,36 @@ enum ACTION_TYPES {
 }
 
 function convertModuleToModuleId(module: IDobiss2MqttModule) {
-    return module.address + 40;
+    return module.address + 64;
 }
 
 function createOutputsBuffer({ batch, moduleId }: { batch: IDobiss2MqttOutput[]; moduleId: number }): Buffer {
     // If there are not 24 modules we need to padd up the rest with 0xFF
     // So let's make sure we pad it if the batch is too small.
+    let arr: number[] = []
+
+    for (let i = 0; i<24; i++) {
+        const output = batch[i];
+
+        if (output) {
+            arr.push(output.address);
+        } else {
+            arr.push(0xFF);
+        }
+    }
+
     return Buffer
-        .from(new Array(24)
-        .map((_, index) => {
-            const output = batch[index];
-
-            if (output) {
-                return output.address;
-            }
-
-            return 0xFF;
-        })
-        .reduce((acc, item) => {
-            return acc.concat([ moduleId, item ]);
-        }, [] as number[]));
+        .from(arr
+              .reduce((acc, item) => {
+                  return acc.concat([ item === 0xFF ? item : moduleId, item ]);
+              }, [] as number[]))
 }
 
-export default class AmbiancePRO implements IDobissProtocol {
+export default class SX implements IDobissProtocol {
 
-    private socketClient: RxSocket;
+    private socketClient: IRequestResponseBuffer;
 
-    constructor({ socketClient }: { socketClient: RxSocket }) {
+    constructor({ socketClient }: { socketClient: IRequestResponseBuffer }) {
         this.socketClient = socketClient;
     }
 

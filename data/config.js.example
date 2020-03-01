@@ -3,14 +3,17 @@ module.exports = {
         // NOTE: this whole object maps to the first argument of socketInstance.connect
         // https://nodejs.org/api/net.html#net_socket_connect_options_connectlistener
         host: '10.0.0.8', // DOBISS_HOST
-        port: 10001 // DOBISS_PORT
+        port: 10001, // DOBISS_PORT
+        interface: 'AMBIANCEPRO' // DOBISS_INTERFACE. SXEVOLUTION, AMBIANCEPRO
     },
     mqtt: {
         // TODO: When tweaking authentication support for MQTT look into how we can add other parameters.
         //       I prefer something which just maps 1:1.
         url: 'mqtt://host' // MQTT_URL
     },
-    pollIntervalInMs: 1000, // POLL_INTERVAL_IN_MS
+    // Can also be 0 to filly disable automated polling. we will only poll once after every action.
+    // Downside is then that the state will not be correct if you use your wall switches to toggle the outputs.
+    pollIntervalInMs: 1000, // POLL_INTERVAL_IN_MS.
     modules: [
         {
             // For now only "relay" works. So we can only turn outputs on or off.

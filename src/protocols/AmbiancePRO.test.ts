@@ -3,8 +3,8 @@ import AmbiancePRO from './AmbiancePRO';
 import { IRequestResponseBuffer } from '../rx-socket';
 import { IDobiss2MqttModule, ModuleType } from '../config';
 
-import ObservableInspector from '../../test/ObservableInspector';
-import fnObservable from '../../test/fnObservable';
+import ObservableInspector from '../test/ObservableInspector';
+import fnObservable from '../test/fnObservable';
 
 describe("protocols/AmbiancePRO", function() {
 

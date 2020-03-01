@@ -44,8 +44,8 @@ convict.addFormat({
             throw new TypeError(`"${v}" Is not a valid module-address.`);
         }
 
-        if (v < 1 || v > 52) {
-            throw new TypeError("A module-address needs to be between 1 and 52");
+        if (v < 1 || v > 82) {
+            throw new TypeError("A module-address needs to be between 1 and 82");
         }
     },
 });

@@ -12,9 +12,6 @@ COPY "./" "/app/"
 ## compile typescript
 RUN npm run build
 
-RUN [ ! -f /app/dist/index.js ] && echo "build not ok" && exit 1
-
-
 ## remove packages of devDependencies
 RUN npm prune --production
 

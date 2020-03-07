@@ -12,6 +12,9 @@ COPY "./" "/app/"
 ## compile typescript
 RUN npm run build
 
+RUN [ ! -f /app/dist/index.js ] && echo "build not ok" && exit 1
+
+
 ## remove packages of devDependencies
 RUN npm prune --production
 
@@ -29,7 +32,5 @@ VOLUME ["/data"]
 COPY --from=builder "/app/dist/" "/app/dist/"
 COPY --from=builder "/app/node_modules/" "/app/node_modules/"
 COPY --from=builder "/app/package.json" "/app/package.json"
-
-RUN ls /app/dist
 
 CMD ["npm", "run", "start:prod"]

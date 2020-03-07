@@ -9,6 +9,7 @@ import {
     take,
     tap,
     timeout,
+    filter,
 } from "rxjs/operators";
 
 import { Socket, SocketConnectOpts } from "net";
@@ -48,6 +49,9 @@ export default class RxSocket implements IRequestResponseBuffer {
 
                         const done$ = (fromEvent(socket, "data") as Observable<Buffer>)
                             .pipe(
+                                filter((output: Buffer) => {
+                                    return input.compare(output, 0, 8, 0, 8) === 0
+                                }),
                                 take(1),
                                 timeout(5000),
                                 tap({

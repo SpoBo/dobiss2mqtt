@@ -1,4 +1,5 @@
 import DEBUG from "debug";
+import ms from "ms";
 
 import {
     combineLatest,
@@ -20,6 +21,7 @@ import {
     switchMapTo,
     take,
     tap,
+    startWith,
 } from "rxjs/operators";
 
 import { RxMqtt } from "./rx-mqtt";
@@ -239,6 +241,8 @@ const processor$ = combineLatest(
                                         }),
                                     );
 
+                                const configTimer$ = interval(ms("5m"))
+
                                 // Send discovery info for all the configured devices.
                                 // So this will be an array of observables which will each emit
                                 // the config for every output.
@@ -254,7 +258,13 @@ const processor$ = combineLatest(
                                         }),
                                 );
 
-                                return merge(config$, actionRequests$, outputStates$);
+                                const periodicConfig$ = configTimer$
+                                    .pipe(
+                                        startWith(null),
+                                        switchMapTo(config$),
+                                    )
+
+                                return merge(periodicConfig$, actionRequests$, outputStates$);
                             });
 
                         return merge(...observables);

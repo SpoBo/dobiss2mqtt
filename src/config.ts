@@ -152,7 +152,7 @@ export enum DobissInterfaceTypes {
 export interface IDobissConfig {
     host: string;
     port: number;
-    interface: DobissInterfaceTypes
+    interface: DobissInterfaceTypes;
 }
 
 export interface IMqttConfig {

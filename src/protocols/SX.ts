@@ -37,7 +37,7 @@ function convertModuleToModuleId(module: IDobiss2MqttModule) {
 function createOutputsBuffer({ batch, moduleId }: { batch: IDobiss2MqttOutput[]; moduleId: number }): Buffer {
     // If there are not 24 modules we need to padd up the rest with 0xFF
     // So let's make sure we pad it if the batch is too small.
-    let arr: number[] = []
+    const arr: number[] = []
 
     for (let i = 0; i<24; i++) {
         const output = batch[i];

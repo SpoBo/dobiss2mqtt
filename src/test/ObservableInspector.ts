@@ -2,7 +2,7 @@ import { Subscription, Observable } from "rxjs"
 
 export default class ObservableInspector {
     private unsubscribe: Subscription
-    private done: boolean = false
+    private done = false
     private nexted: any[] = []
     private err: any
 

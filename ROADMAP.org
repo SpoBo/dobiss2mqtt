@@ -54,6 +54,8 @@ can intercept the keypress messages per switch. This will then allow me to
 expose those switches as real switches in mqtt.
 
 So it'll probably be another project which has to be deployed on ESP modules.
+
+Should use this protocol: https://www.home-assistant.io/integrations/device_trigger.mqtt/
 * [#C] look into restarting/dropping requests automatically when things go away (like the socket or mqtt)
 The state for an output in particular needs to be fully reset. If we fail to
 emit a state we should also not mark that new state as the last known state. We

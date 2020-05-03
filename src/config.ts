@@ -147,6 +147,9 @@ const CONVICT_SCHEMA = {
 export enum DobissInterfaceTypes {
     ambiancePro = 'AMBIANCEPRO',
     sxEvolution ='SXEVOLUTION',
+    sxAmbiance = 'SXAMBIANCE',
+    evolutionPro ='EVOLUTIONPRO',
+    nxt ='NXT',
 }
 
 export interface IDobissConfig {

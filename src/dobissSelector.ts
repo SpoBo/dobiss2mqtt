@@ -32,9 +32,14 @@ export interface IDobissProtocol {
 }
 
 export default function dobissSelector(config: IDobissConfig, socketClient: RxSocket): IDobissProtocol {
-    if (config.interface === DobissInterfaceTypes.sxEvolution) {
-        return new SX({ socketClient })
+    switch (config.interface) {
+        case DobissInterfaceTypes.ambiancePro:
+        case DobissInterfaceTypes.nxt:
+        case DobissInterfaceTypes.evolutionPro:
+            return new AmbiancePRO({ socketClient });
+        case DobissInterfaceTypes.sxAmbiance:
+        case DobissInterfaceTypes.sxEvolution:
+        default:
+            return new SX({ socketClient })
     }
-
-    return new AmbiancePRO({ socketClient });
 }

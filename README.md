@@ -24,29 +24,44 @@ the state of every relay you have.
 See [data/config.js.example](data/config.js.example) for the main configuration. Rename it
 to `config.js` and place it under the data folder.
 
-There are also a couple ENV overrides which can also be controlled from the
-config.js file.
+There are also a couple of things which can be configured through an environment variable or through the config file.
 
-To control the polling interval:
-POLL_INTERVAL_IN_MS=500
+| env                 | config key       | description                                                                                                                     | example         |
+|---------------------|------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------|
+| CONFIG_PATH         | -                | Where does the config.js file live.                                                                                             | /data/config.js |
+| POLL_INTERVAL_IN_MS | pollIntervalInMs | To control the polling interval. Eg: the time between polling the output states on the modules in milliseconds.                 | 500             |
+| MQTT_URL            | mqtt.urls        | URL for the MQTT broker                                                                                                         | mqtt://host     |
+| DOBISS_HOST         | dobiss.host      | IP of your Dobiss IP Interface (CAN Programmer)                                                                                 | 192.168.0.2     |
+| DOBISS_PORT         | dobiss.port      | Port of your Dobiss IP Interface (CAN Programmer)                                                                               | 10001           |
+| DOBISS_INTERFACE    | dobiss.interface | Which type of Dobiss installation. See Dobiss Installation Types for the possibilities.                                         | ANBIANCEPRO     |
+| -                   | modules          | The array of modules along with their outputs available on your dobiss installation. Needs to be configured in the config file. | -               |
+| DEBUG               | -                | Control what gets logged. See debug npm package. Everything from dobiss2mqtt starts with 'dobiss2mqtt.'                         | *               |
 
-To control where the config.js file is located. It is from the root of the node
-app itself should you provide a relative path:
-CONFIG_PATH=/data/config.js
+## Dobiss Installation Types
 
-To control the mqtt url:
-MQTT_URL
+I don't know all the protocols dobiss speaks. But this is a list of all the installations / systems there are. 
+http://www.dobiss.com/nl/vorige-gammas as well as http://www.dobiss.com/nl/onze-oplossingen.
 
-To control the dobiss host:
-DOBISS_HOST
+### SX Evolution
+Set dobiss.interface to SXEVOLUTION
 
-To control the dobiss port:
-DOBISS_PORT
+### SX Ambiance
+Set dobiss.interface to SXAMBIANCE
 
-To control the logging the debug package is used for now. dobiss2mqtt loggers
-are always namespaced on `dobiss2mqtt.`. So you can use this as your filter.
+Currently this is linked to the same protocol as SXAMBIANCE. This might not be working correctly.
 
-By default on docker there is no logging enabled except when it crashes.
+### Ambiance PRO
+Set dobiss.interface to AMBIANCEPRO
+
+### Evolution PRO
+Set dobiss.interface to EVOLUTIONPRO
+
+Currently this is linked to the same protocol as AMBIANCEPRO. This might not be working correctly.
+
+### NXT
+Set dobiss.interface to NXT.
+
+Currently this is linked to the same protocol as AMBIANCEPRO. This might not be working correctly.
 
 ## Installation
 

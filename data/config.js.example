@@ -22,6 +22,7 @@ module.exports = {
             type: 'relay',
             // Either manually set the number of the relay or let dobiss2mqtt set the number automatically
             // depending on the order of the module in the array.
+            // The first one is always 1. The protocol automatically maps it to a weird internal number if it is required.
             number: 1,
             // The outputs (or lights in my case) are just represented as strings which are used to
             // give them their names.
@@ -42,6 +43,7 @@ module.exports = {
         },
         {
             type: 'relay',
+            number: 2,
             outputs: [
                 "nachthal",
                 "office",

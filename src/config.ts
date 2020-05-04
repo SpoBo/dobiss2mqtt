@@ -82,6 +82,15 @@ convict.addFormat({
     },
 });
 
+export enum DobissInterfaceTypes {
+    ambiancePro = 'AMBIANCEPRO',
+    sxEvolution ='SXEVOLUTION',
+    sxAmbiance = 'SXAMBIANCE',
+    evolutionPro ='EVOLUTIONPRO',
+    nxt = 'NXT',
+    fake = 'FAKE'
+}
+
 const CONVICT_SCHEMA = {
     dobiss: {
         host: {
@@ -100,7 +109,14 @@ const CONVICT_SCHEMA = {
             default: 'AMBIANCEPRO',
             doc: "Which protocol to talk to Dobiss. AMBIANCEPRO or SXEVOLUTION.",
             env: "DOBISS_INTERFACE",
-            format: [ "AMBIANCEPRO", "SXEVOLUTION" ],
+            format: [
+                DobissInterfaceTypes.ambiancePro,
+                DobissInterfaceTypes.nxt,
+                DobissInterfaceTypes.evolutionPro,
+                DobissInterfaceTypes.sxAmbiance,
+                DobissInterfaceTypes.sxEvolution,
+                process.env.NODE_ENV === 'development' ? DobissInterfaceTypes.fake : null
+            ].filter(v => v),
         },
     },
 
@@ -144,14 +160,6 @@ const CONVICT_SCHEMA = {
     },
 };
 
-export enum DobissInterfaceTypes {
-    ambiancePro = 'AMBIANCEPRO',
-    sxEvolution ='SXEVOLUTION',
-    sxAmbiance = 'SXAMBIANCE',
-    evolutionPro ='EVOLUTIONPRO',
-    nxt ='NXT',
-}
-
 export interface IDobissConfig {
     host: string;
     port: number;
@@ -185,6 +193,7 @@ export interface IDobiss2MqttOutput {
     // NOTE: This is index-based.
     address: number;
     name: string;
+    dimmable: boolean;
 }
 
 export default class ConfigManager {
@@ -206,6 +215,9 @@ export default class ConfigManager {
     /**
      * Exposes the relay config in a structured way.
      * multiple relays. 1 relay has multiple outputs.
+     *
+     * TODO: Refactor to be Observable<IDobiss2MqttModule>
+     *       Eg: no array.
      */
     public get modules$(): Observable<IDobiss2MqttModule[]> {
         return this.config$
@@ -222,6 +234,7 @@ export default class ConfigManager {
                                         return {
                                             address: outputIndex,
                                             name,
+                                            dimmable: module.type === ModuleType.dimmer
                                         };
                                     }),
                                 type: module.type,

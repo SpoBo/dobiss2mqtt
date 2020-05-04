@@ -40,6 +40,31 @@ const debug = DEBUG("dobiss2mqtt.index");
 // /data/config.js is the default location if we run under docker and mount the data folder.
 const configManager = new ConfigManager(process.env.CONFIG_PATH || "/data/config.js");
 
+type HassDeviceConfig = {
+    identifiers: string[];
+    manufacturer: string;
+    name: string;
+    via_device: string;
+}
+
+type HassLightConfig = {
+    cmd_t: string;
+    device: HassDeviceConfig;
+    name: string;
+    optimistic: boolean;
+    schema: "json";
+    stat_t: string;
+    unique_id: string;
+    "~": string;
+    brightness: boolean;
+    brightness_scale?: number;
+}
+
+type HassLightState = {
+    state: "ON" | "OFF";
+    brightness?: number;
+}
+
 /**
  * I know this is overkill.
  */
@@ -57,7 +82,7 @@ const processor$ = combineLatest(
                 port: dobissConfig.port,
             });
 
-            const dobiss = dobissSelector(dobissConfig, socketClient);
+            const dobiss = dobissSelector(dobissConfig, socketClient, configManager.modules$);
 
             // Create the MQTT client which will also kick into gear when we need it.
             const mqttClient = new RxMqtt(mqttConfig.url);
@@ -68,10 +93,6 @@ const processor$ = combineLatest(
                     map((modules) => {
                         return modules
                         .map((module) => {
-                            if (module.type !== ModuleType.relay) {
-                                throw new Error("Only relay modules are supported for now.");
-                            }
-
                             return {
                                 ...module,
                                 outputs: module
@@ -80,26 +101,33 @@ const processor$ = combineLatest(
                                         const outputId = `output_${module.address}x${output.address}`;
                                         const id = `${canIdentifier}_${outputId}`;
 
+                                        const config: HassLightConfig = {
+                                            "cmd_t": `~/set`,
+                                            "device": {
+                                                identifiers: [
+                                                    `${DOBISS_NAMESPACE}_${outputId}`,
+                                                ],
+                                                manufacturer: "Dobiss",
+                                                name: output.name,
+                                                /* eslint-disable-next-line @typescript-eslint/camelcase */
+                                                via_device: canIdentifier,
+                                            },
+                                            "name": output.name,
+                                            "optimistic": false,
+                                            "schema": "json",
+                                            "stat_t": `~/state`,
+                                            "unique_id": id,
+                                            "~": `homeassistant/light/${id}`,
+                                            "brightness": output.dimmable
+                                        };
+
+                                        if (output.dimmable) {
+                                            config["brightness_scale"] = 100;
+                                        }
+
                                         return {
                                             ...output,
-                                            config: {
-                                                "cmd_t": `~/set`,
-                                                "device": {
-                                                  identifiers: [
-                                                      `${DOBISS_NAMESPACE}_${outputId}`,
-                                                  ],
-                                                  manufacturer: "Dobiss",
-                                                  name: output.name,
-                                                  /* eslint-disable-next-line @typescript-eslint/camelcase */
-                                                  via_device: canIdentifier,
-                                               },
-                                                "name": output.name,
-                                                "optimistic": false,
-                                                "schema": "json",
-                                                "stat_t": `~/state`,
-                                                "unique_id": id,
-                                                "~": `homeassistant/light/${id}`,
-                                            },
+                                            config,
                                         };
                                     }),
                             };
@@ -127,10 +155,11 @@ const processor$ = combineLatest(
                                                         return { request: JSON.parse(request) };
                                                     }),
                                                     switchMap(({ request }) => {
-                                                        debug('request to set state to %s for module %d and output %d', request.state, module.address, output.address)
+                                                        debug('request to set %j for module %d and output %d', request, module.address, output.address)
+
                                                         const action$ = request.state === "ON"
                                                             ?
-                                                            dobiss.on(module, output)
+                                                            dobiss.on(module, output, output.dimmable ? request.brightness : null)
                                                             :
                                                             dobiss.off(module, output);
 
@@ -151,7 +180,6 @@ const processor$ = combineLatest(
                                                 );
                                         }),
                                 );
-
 
                                 const periodicallyRequest$ = configManager.pollInterval$
                                     .pipe(
@@ -206,7 +234,7 @@ const processor$ = combineLatest(
                                                 .pipe(
                                                     // Only continue when the state effectively changed.
                                                     distinctUntilChanged((a, b) => {
-                                                        return a.powered === b.powered;
+                                                        return a.powered === b.powered && a.brightness === b.brightness;
                                                     }),
                                                     tap({
                                                         next(a) {
@@ -222,9 +250,15 @@ const processor$ = combineLatest(
                                                             return empty();
                                                         }
 
-                                                        const payload = JSON.stringify({
+                                                        const state: HassLightState = {
                                                             state: update.powered ? "ON" : "OFF",
-                                                        });
+                                                        }
+
+                                                        if (output.dimmable) {
+                                                            state.brightness = update.brightness ?? 0
+                                                        }
+
+                                                        const payload = JSON.stringify(state);
 
                                                         return mqttClient
                                                             .publish$(

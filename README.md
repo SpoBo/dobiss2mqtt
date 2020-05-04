@@ -6,10 +6,10 @@ server.
 It will then expose your lights (outputs) as MQTT lights using the Home Assistant
 discovery protocol.
 
-For now this only supports basic lights since I'm a cheap bastard and I only have
-lights & switches on the dobiss system. No dimmers. No programs. No moods. If
-you want it, add it yourself or pay my electrician to come and install those
-things so I can play with it.
+For now this only supports:
+
+* turning relay outputs on/off
+* dimming dimmer outputs to a specific percentage
 
 It will set up a socket connection to the CAN Programmer. The intention is to
 not have a permanent connection set up so that the regular dobiss app still

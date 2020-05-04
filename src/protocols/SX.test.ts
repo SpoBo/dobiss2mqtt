@@ -32,11 +32,13 @@ describe("protocols/SX", function() {
                         outputs: [
                             {
                                 name: "berging",
-                                address: 0
+                                address: 0,
+                                dimmable: false,
                             },
                             {
                                 name: "koele_berging",
-                                address: 1
+                                address: 1,
+                                dimmable: false,
                             }
                         ]
                     },
@@ -46,11 +48,13 @@ describe("protocols/SX", function() {
                         outputs: [
                             {
                                 name: "nachthal",
-                                address: 0
+                                address: 0,
+                                dimmable: true,
                             },
                             {
                                 name: "office",
-                                address: 1
+                                address: 1,
+                                dimmable: true,
                             }
                         ]
                     },
@@ -370,11 +374,72 @@ describe("protocols/SX", function() {
                             clientControl
                                 .next(
                                     Buffer
-                                        .from([ 175,   2,   null,
-                                                1,   0,   0,   8,   1,   8, 255, 255, 255, 255, 255, 255, 175, 255, 255, 255, 255, 255, 255,
-                                                255, 255, 255, 255, 255, 255, 255, 255, 255, 255,   1, 7,   1, 255, 255,  64, 255, 255, 255, 2,
-                                                55, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 2,
-                                                55, 255, 255, 255
+                                        .from([ 175,
+                                                2,
+                                                null,
+                                                1,
+                                                0,
+                                                0,
+                                                8,
+                                                1,
+                                                8,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                175,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                1,
+                                                7,
+                                                1,
+                                                255,
+                                                255,
+                                                 64,
+                                                255,
+                                                255,
+                                                255,
+                                                2,
+                                                55,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                                2,
+                                                55,
+                                                255,
+                                                255,
+                                                255
                                               ])
                                 )
                         })
@@ -385,12 +450,12 @@ describe("protocols/SX", function() {
                     });
                 });
 
-                describe("when we ask to turn off the first output on the first module", function() {
+                describe("when we ask to turn off the first output on the second module", function() {
 
                     let result: ObservableInspector
                     beforeEach(function() {
                         const on$ = instance
-                            .off(modules[1], modules[0].outputs[0])
+                            .off(modules[1], modules[1].outputs[0])
 
                         result = new ObservableInspector(on$)
                     })
@@ -429,6 +494,84 @@ describe("protocols/SX", function() {
                     });
 
                 });
+
+                describe('when we ask to dim the first output of the second module to 50%', function() {
+
+                    let result: ObservableInspector
+                    beforeEach(function() {
+                        const on$ = instance
+                            .on(modules[1], modules[1].outputs[0], 50)
+
+                        result = new ObservableInspector(on$)
+                    })
+
+                    test("it should have sent the correct request to the socket", function() {
+                        expect(client.request).toHaveBeenCalledWith(
+                            Buffer.from([
+                                0xED,
+                                0x43,
+                                0x31,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0xAF,
+                                0xAF,
+
+                                0x42, // second module
+                                0x00, // first output
+                                0x32, // turn on to 50%
+                            ])
+                        )
+                    });
+                })
+
+
+                describe('when we ask to dim the first output of the second module to 2%', function() {
+
+                    let result: ObservableInspector
+                    beforeEach(function() {
+                        const on$ = instance
+                            .on(modules[1], modules[1].outputs[0], 2)
+
+                        result = new ObservableInspector(on$)
+                    })
+
+                    test("it should have sent the correct request to the socket to dim to 3% because 2 is toggle", function() {
+                        expect(client.request).toHaveBeenCalledWith(
+                            Buffer.from([
+                                0xED,
+                                0x43,
+                                0x31,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0x00,
+                                0xAF,
+                                0xAF,
+
+                                0x42, // second module
+                                0x00, // first output
+                                0x03, // turn on to 3%
+                            ])
+                        )
+                    });
+                })
+
             });
         });
     });

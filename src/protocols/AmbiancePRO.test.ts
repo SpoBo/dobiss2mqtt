@@ -32,11 +32,13 @@ describe("protocols/AmbiancePRO", function() {
                         outputs: [
                             {
                                 name: "berging",
-                                address: 0
+                                address: 0,
+                                dimmable: false
                             },
                             {
                                 name: "koele_berging",
-                                address: 1
+                                address: 1,
+                                dimmable: false
                             }
                         ]
                     },
@@ -46,11 +48,13 @@ describe("protocols/AmbiancePRO", function() {
                         outputs: [
                             {
                                 name: "nachthal",
-                                address: 0
+                                address: 0,
+                                dimmable: true
                             },
                             {
                                 name: "office",
-                                address: 1
+                                address: 1,
+                                dimmable: true
                             }
                         ]
                     },
@@ -233,6 +237,184 @@ describe("protocols/AmbiancePRO", function() {
                             ])
                         )
                     });
+
+                    describe('when we see a response indicating that output 1 is dimmed to a min of 1% and output 2 set to a max of 100', function() {
+                        beforeEach(function() {
+                            return clientControl
+                                .next(
+                                    Buffer.from([
+                                        0xaf,
+                                        0x01,
+                                        0x08,
+                                        0x02,
+                                        0x00,
+                                        0x00,
+                                        0x08,
+                                        0x01,
+                                        0x00,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xaf,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0x01,
+                                        0x64,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff
+                                    ])
+                                )
+                        })
+
+                        test('we should receive an output state of {1,powered,1%} and {2,powered,100%}', function() {
+                            expect(result.items).toEqual([
+                                {
+                                    output: modules[1].outputs[0],
+                                    powered: true,
+                                    brightness: 1
+                                },
+                                {
+                                    output: modules[1].outputs[1],
+                                    powered: true,
+                                    brightness: 100
+                                },
+                            ])
+                        })
+                    })
+
+
+                    describe('when we see a response indicating that output 1 is dimmed to 50% and output 2 set to off', function() {
+                        beforeEach(function() {
+                            return clientControl
+                                .next(
+                                    Buffer.from([
+                                        0xaf,
+                                        0x01,
+                                        0x08,
+                                        0x02,
+                                        0x00,
+                                        0x00,
+                                        0x08,
+                                        0x01,
+                                        0x00,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xaf,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0x32,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff
+                                    ])
+                                )
+                        })
+
+                        test('we should receive an output state of {1,powered,1%} and {2,powered,100%}', function() {
+                            expect(result.items).toEqual([
+                                {
+                                    output: modules[1].outputs[0],
+                                    powered: true,
+                                    brightness: 50
+                                },
+                                {
+                                    output: modules[1].outputs[1],
+                                    powered: false
+                                },
+                            ])
+                        })
+                    })
                 });
 
                 describe("when we ask to turn on the second output on the first module", function() {
@@ -271,7 +453,7 @@ describe("protocols/AmbiancePRO", function() {
                                 0x01, // power on
                                 0xFF, // delay on
                                 0xFF, // delay off
-                                0x40, // dimmer max
+                                0x64, // dimmer max
                                 0xFF, // dimmer speed
                                 0xFF
                             ])
@@ -281,15 +463,79 @@ describe("protocols/AmbiancePRO", function() {
                     describe("when we return any response from the socket", function() {
 
                         beforeEach(function() {
+                            // TODO: Figoure out the format of this response buffer.
+                            //       Maybe there is some interesting information in here.
                             clientControl
                                 .next(
                                     Buffer
-                                        .from([ 175,   2,   null,
-                                                1,   0,   0,   8,   1,   8, 255, 255, 255, 255, 255, 255, 175, 255, 255, 255, 255, 255, 255,
-                                                255, 255, 255, 255, 255, 255, 255, 255, 255, 255,   1, 7,   1, 255, 255,  64, 255, 255, 255, 2,
-                                                55, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 2,
-                                                55, 255, 255, 255
-                                              ])
+                                        .from([
+                                            175,
+                                            2, // action
+                                            8, // this was 8 in the original request.
+                                            1, // module address
+                                            0,
+                                            0,
+                                            8,
+                                            1,
+                                            8,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            175,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            1,
+                                            7,
+                                            1,
+                                            255,
+                                            255,
+                                            64,
+                                            255,
+                                            255,
+                                            255,
+                                            2,
+                                            55,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            255,
+                                            2,
+                                            55,
+                                            255,
+                                            255,
+                                            255
+                                        ])
                                 )
                         })
 
@@ -335,7 +581,7 @@ describe("protocols/AmbiancePRO", function() {
                                 0x00, // power off
                                 0xFF, // delay on
                                 0xFF, // delay off
-                                0x40, // dimmer max
+                                0x64, // dimmer max
                                 0xFF, // dimmer speed
                                 0xFF
                             ])
@@ -346,6 +592,52 @@ describe("protocols/AmbiancePRO", function() {
 
                         test.todo("it should have completed the turn off request");
 
+                    });
+
+                });
+
+
+                describe("when we ask to dim the first output on the second module to 50%", function() {
+
+                    let result: ObservableInspector
+                    beforeEach(function() {
+                        const off$ = instance
+                            .on(modules[1], modules[0].outputs[0], 50)
+
+                        result = new ObservableInspector(off$)
+                    })
+
+                    test("it should have sent the correct request to the socket", function() {
+                        expect(client.request).toHaveBeenCalledWith(
+                            Buffer.from([
+                                0xAF,
+                                0x02, // 2 for action
+                                0x10, // for relay module
+                                0x02, // 1 for module address
+                                0x00,
+                                0x00,
+                                0x08,
+                                0x01,
+
+                                0x08,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xAF,
+
+                                0x02, // module address
+                                0x00, // output address
+                                0x01, // power on
+                                0xFF, // delay on
+                                0xFF, // delay off
+                                0x32, // dimmer max
+                                0xFF, // dimmer speed
+                                0xFF
+                            ])
+                        )
                     });
 
                 });

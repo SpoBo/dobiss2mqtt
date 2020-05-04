@@ -55,6 +55,7 @@ type SimpleActionBufferOptions = {
     moduleAddress: number;
     outputAddress: number;
     actionType: ACTION_TYPES;
+    brightness?: number
 };
 
 function convertModuleTypeToNumber(moduleType: ModuleType): number {
@@ -78,7 +79,7 @@ function createSimpleActionBuffer(options: SimpleActionBufferOptions): Buffer {
             options.actionType,
             0xFF, // delay on
             0xFF, // delay off
-            0x40, // dimmer (64 = 100%)
+            options.brightness ?? 0x64, // dimmer (0x0 to 0x64 = 100%) So it's basically 100%.
             0xFF, // dimmer speed
             0xFF, // not used
         ]);
@@ -139,8 +140,8 @@ export default class AmbiancePRO implements IDobissProtocol {
         return this.action(module, output, ACTION_TYPES.off);
     }
 
-    public on (module: IDobiss2MqttModule, output: IDobiss2MqttOutput): Observable<null> {
-        return this.action(module, output, ACTION_TYPES.on);
+    public on (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, brightness?: number): Observable<null> {
+        return this.action(module, output, ACTION_TYPES.on, brightness);
     }
 
     public pollModule (module: IDobiss2MqttModule): Observable<IOutputState> {
@@ -172,10 +173,16 @@ export default class AmbiancePRO implements IDobissProtocol {
                                 return acc;
                             }
 
-                            acc.push({
-                                output,
-                                powered: !!state,
-                            });
+                            let out: IOutputState = {
+                              output,
+                              powered: !!state,
+                            }
+
+                            if (output.dimmable && out.powered) {
+                                out.brightness = state;
+                            }
+
+                            acc.push(out);
 
                             return acc;
                         }, [] as IOutputState[]);
@@ -185,11 +192,11 @@ export default class AmbiancePRO implements IDobissProtocol {
             );
     }
 
-    private action (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number): Observable<null> {
+    private action (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number, brightness?: number): Observable<null> {
         const header = createActionHeaderPayload(
             {
                 moduleAddress: module.address,
-                moduleType: module.type,
+                moduleType: module.type
             },
         );
 
@@ -198,6 +205,7 @@ export default class AmbiancePRO implements IDobissProtocol {
                 actionType,
                 moduleAddress: module.address,
                 outputAddress: output.address,
+                brightness
             },
         );
 

@@ -12,13 +12,16 @@ module.exports = {
         //       I prefer something which just maps 1:1.
         url: 'mqtt://host'
     },
-    // Can also be 0 to filly disable automated polling. we will only poll once after every action.
+    // Can also be 0 to fully disable automated polling.
+    // It will then only poll once after every action.
     // Downside is then that the state will not be correct if you use your wall switches to toggle the outputs.
+    // Upside is that your CAN Controller will not be spammed and that there will be less conflict with the native dobiss apps.
+    //
     pollIntervalInMs: 1000,
     modules: [
         {
-            // For now only "relay" works. So we can only turn outputs on or off.
-            // But these might be supported in the future: "dimmer", "0-10v"
+            // For now only "relay" and "dimmer" work. So we can only turn outputs on or off or dim a light to X %
+            // But these might be supported in the future: "0-10v"
             type: 'relay',
             // Either manually set the number of the relay or let dobiss2mqtt set the number automatically
             // depending on the order of the module in the array.

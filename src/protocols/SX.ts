@@ -68,8 +68,8 @@ export default class SX implements IDobissProtocol {
         return this.action(module, output, ACTION_TYPES.off);
     }
 
-    public on (module: IDobiss2MqttModule, output: IDobiss2MqttOutput): Observable<null> {
-        return this.action(module, output, ACTION_TYPES.on);
+    public on (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, brightness?: number): Observable<null> {
+        return this.action(module, output, ACTION_TYPES.on, brightness);
     }
 
     // TODO: add ability to dim. in that case we set the third argument to a value of 255 relative from 1 to 100.
@@ -156,7 +156,9 @@ export default class SX implements IDobissProtocol {
         return concat(...outputs);
     }
 
-    private action (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number): Observable<null> {
+    private action (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number, brightness?: number): Observable<null> {
+        const action = getActionValue(actionType, output.dimmable, brightness)
+
         const buffer = Buffer
             .from([
                 0xED,
@@ -177,7 +179,7 @@ export default class SX implements IDobissProtocol {
                 0xAF,
                 convertModuleToModuleId(module),
                 output.address,
-                actionType,
+                action,
             ]);
 
         return this.socketClient
@@ -186,4 +188,20 @@ export default class SX implements IDobissProtocol {
                 mapTo(null),
             );
     }
+}
+
+
+function getActionValue(actionType: number, dimmable: boolean, brightness?: number): number {
+    if (!dimmable) {
+        return actionType
+    }
+
+    const suggested = brightness ?? (actionType === ACTION_TYPES.on ? 100 : 0)
+
+    // Can't deal with 2% as it is toggling on SX.
+    if (suggested === 2) {
+        return 3
+    }
+
+    return suggested
 }

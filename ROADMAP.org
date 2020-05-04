@@ -1,4 +1,7 @@
 #+TITLE: Plan of Attack
+* DONE [#B] Support Dimmers
+Should be supported for SX & Ambiance PRO.
+Verified with the Fake dobiss interface that dimming protocol towards HASS is supported correctly.
 * DONE [#A] Implement [[https://github.com/mozilla/node-convict][Convict]] for the config
 Also rework how we do the config.
 
@@ -47,7 +50,6 @@ I can create a kind of facade which has the exact same API for both protocols.
 index.ts just consumes whichever one is configured.
 
 Will need some refactoring for this first.
-* look into dimmers supported by dobiss
 * [#A] look into switches
 I'll probably have to hook hardware into the TCP loops for the switches. Then I
 can intercept the keypress messages per switch. This will then allow me to
@@ -70,7 +72,9 @@ Might be nice when you are finetuning your configuration.
 If we do this then we need to make sure to somehow re-emit the config when we
 update it. And if we remove an output then we should emit blank config for that
 output so that Home Assistant can remove the device / entity.
-* Get [[https://volta.sh][https://volta.sh]] working properly
+
+We could also store the config somewhere per device which we last emitted. When we notice config that is no longer there we need to also send an erase config message.
+* DONE Get [[https://volta.sh][https://volta.sh]] working properly
 It's in package.json but I don't really see it working yet on my machine.
 * Add a docker healthcheck
 We can do this by having a file which is written on every non-avoideable error
@@ -85,8 +89,6 @@ Then we can create a HEALTHCHECK script which will read the file and see if it
 exists. If so, delete it and mark us unhealthy. If it does not exist we are healthy.
 * Figure out if Home Assistant emits a request for config as part of the discovery protocol
 It might do something like this. And we could then re-emit all the config we have.
-* [#B] Support Dimmers
-Can it be done through CAN Programmer ?
 * Support Covers
 Can it be done through CAN Programmer ?
 * Support Power Plugs
@@ -101,3 +103,20 @@ Can it be done through CAN Programmer ?
 I see that it is module of address 0x53 for Dobiss SX.
 Maybe it can also be used to poll the moods ? Although it kind of just turns on
 and the state is not really kept.
+* Support 0-10v on master controller
+hierbij info voor lichtcel , zelf nog niet getest… want ik gebruik hem niet voor HA
+
+Je moet dan in de header ‘c’ ‘2’ sturen ipv ‘c’ ‘0’ (ascii codes)
+
+HEADER
+0xED 0x63 0x32 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0xAF 0xAF
+
+En dan in de body 86 (0x56) en 0, aangevuld tot 48 bytes.
+
+ok, even getest, ik krijg dit als string terug
+
+60 FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+
+is hex, dus 60 komt overeen met momenteel 97% licht sterkte
+* TODO Spread polling
+What I mean is that if we set 1000 and that we have 2 modules that we make sure to poll the second module only 500ms after the first one. This way we spread the load a little more and we don't spam the controller for multiple modules one after another.

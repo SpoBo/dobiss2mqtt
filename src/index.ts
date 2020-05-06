@@ -26,7 +26,7 @@ import {
 
 import { RxMqtt } from "./rx-mqtt";
 
-import ConfigManager, { ModuleType } from "./config";
+import ConfigManager from "./config";
 import dobissSelector from "./dobissSelector";
 
 import RxSocket from "./rx-socket";
@@ -152,9 +152,9 @@ const processor$ = combineLatest(
 
                                                         const action$ = request.state === "ON"
                                                             ?
-                                                            dobiss.on(module, output, output.dimmable ? request.brightness : null)
+                                                            dobiss.on(module.address, output.address, output.dimmable ? request.brightness : null)
                                                             :
-                                                            dobiss.off(module, output);
+                                                            dobiss.off(module.address, output.address);
 
                                                         return action$
                                                             .pipe(
@@ -192,7 +192,7 @@ const processor$ = combineLatest(
                                         switchMap(() => {
                                             debug('start polling module %d', module.address)
                                             return dobiss
-                                                .pollModule(module);
+                                                .pollModule(module.address);
                                         }),
                                     );
 

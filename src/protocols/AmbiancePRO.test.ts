@@ -5,6 +5,7 @@ import { IDobiss2MqttModule, ModuleType } from '../config';
 
 import ObservableInspector from '../test/ObservableInspector';
 import fnObservable from '../test/fnObservable';
+import { from } from 'rxjs';
 
 describe("protocols/AmbiancePRO", function() {
 
@@ -66,14 +67,14 @@ describe("protocols/AmbiancePRO", function() {
 
                 let instance: AmbiancePRO;
                 beforeEach(function() {
-                    instance = new AmbiancePRO({ socketClient: client })
+                    instance = new AmbiancePRO({ socketClient: client, modules$: from(modules) })
                 })
 
                 describe("when we poll the first module", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const poll$ = instance
-                            .pollModule(modules[0])
+                            .pollModule(1)
 
                         result = new ObservableInspector(poll$)
                     })
@@ -205,7 +206,7 @@ describe("protocols/AmbiancePRO", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const poll$ = instance
-                            .pollModule(modules[1])
+                            .pollModule(2)
 
                         result = new ObservableInspector(poll$)
                     })
@@ -422,7 +423,7 @@ describe("protocols/AmbiancePRO", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const on$ = instance
-                            .on(modules[0], modules[0].outputs[1])
+                            .on(1, 1)
 
                         result = new ObservableInspector(on$)
                     })
@@ -550,7 +551,7 @@ describe("protocols/AmbiancePRO", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const off$ = instance
-                            .off(modules[1], modules[0].outputs[0])
+                            .off(2, 0)
 
                         result = new ObservableInspector(off$)
                     })
@@ -602,7 +603,7 @@ describe("protocols/AmbiancePRO", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const off$ = instance
-                            .on(modules[1], modules[0].outputs[0], 50)
+                            .on(2, 0, 50)
 
                         result = new ObservableInspector(off$)
                     })

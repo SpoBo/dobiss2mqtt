@@ -1,11 +1,14 @@
 import {
     from,
     Observable,
+    empty,
 } from "rxjs";
 
 import {
     mapTo,
     switchMap,
+    map,
+    filter,
 } from "rxjs/operators";
 
 import { IRequestResponseBuffer } from "../rx-socket";
@@ -19,11 +22,13 @@ import {
 import {
     IDobissProtocol,
     IOutputState,
+    IDobiss2MqttModuleOnDobiss,
 } from "../dobissSelector";
 
 import {
     convertBufferToByteArray,
 } from "../helpers";
+import withModuleAndOutput from "../operators/withModuleAndOutput";
 
 enum ACTION_TYPES {
     toggle = 0x02,
@@ -129,67 +134,110 @@ function createActionHeaderPayload (options: { moduleType: ModuleType; moduleAdd
 }
 
 export default class AmbiancePRO implements IDobissProtocol {
-
     private socketClient: IRequestResponseBuffer;
+    private _modules$: Observable<IDobiss2MqttModule>;
 
-    constructor({ socketClient }: { socketClient: IRequestResponseBuffer }) {
+    constructor({ socketClient, modules$ }: { socketClient: IRequestResponseBuffer, modules$: Observable<IDobiss2MqttModule> }) {
         this.socketClient = socketClient;
+        this._modules$ = modules$;
     }
 
-    public off (module: IDobiss2MqttModule, output: IDobiss2MqttOutput): Observable<null> {
-        return this.action(module, output, ACTION_TYPES.off);
-    }
-
-    public on (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, brightness?: number): Observable<null> {
-        return this.action(module, output, ACTION_TYPES.on, brightness);
-    }
-
-    public pollModule (module: IDobiss2MqttModule): Observable<IOutputState> {
-        const requestBufffer = createHeaderPayload({
-            code: HEADER_TYPE_CODE.poll,
-            colDataCount: 0,
-            moduleAddress: module.address,
-            moduleType: module.type,
-        });
-
-        return this.socketClient
-            .request(requestBufffer)
+    public off (moduleAddress: number, outputAddress: number): Observable<null> {
+        return this.modules$
             .pipe(
-                switchMap((response) => {
-                    const byteArray = convertBufferToByteArray(response);
-                    const startBit = 4 * 8;
+                withModuleAndOutput(moduleAddress, outputAddress),
+                switchMap(([ module, output ]) => {
+                    if (output) {
+                        return this.action(module, output, ACTION_TYPES.off);
+                    }
 
-                    const states = byteArray.slice(startBit, startBit + 12);
+                    return empty()
+                })
+            )
+    }
 
-                    const combined = states
-                        .reduce((acc, state, index) => {
-                            const output = module
-                                .outputs
-                                .find((outputItem) => {
-                                    return outputItem.address === index;
-                                });
+    public on (moduleAddress: number, outputAddress: number, brightness?: number): Observable<null> {
+        return this.modules$
+            .pipe(
+                withModuleAndOutput(moduleAddress, outputAddress),
+                switchMap(([ module, output ]) => {
+                    if (output) {
+                        return this.action(module, output, ACTION_TYPES.on, brightness);
+                    }
 
-                            if (!output) {
-                                return acc;
-                            }
+                    return empty()
+                })
+            )
+    }
 
-                            let out: IOutputState = {
-                              output,
-                              powered: !!state,
-                            }
+    get modules$(): Observable<IDobiss2MqttModuleOnDobiss> {
+        return this._modules$
+            .pipe(
+                map((module) => {
+                    if (module.type === 'dimmer') {
+                        return {
+                            ...module,
+                            brightnessScale: 10
+                        };
+                    }
 
-                            if (output.dimmable && out.powered) {
-                                out.brightness = state;
-                            }
+                    return module;
+                })
+            )
+    }
 
-                            acc.push(out);
+    public pollModule (moduleAddress: number): Observable<IOutputState> {
+        return this.modules$
+            .pipe(
+                withModuleAndOutput(moduleAddress),
+                switchMap(([ module ]) => {
+                    const requestBufffer = createHeaderPayload({
+                        code: HEADER_TYPE_CODE.poll,
+                        colDataCount: 0,
+                        moduleAddress: module.address,
+                        moduleType: module.type,
+                    });
 
-                            return acc;
-                        }, [] as IOutputState[]);
+                    return this.socketClient
+                        .request(requestBufffer)
+                        .pipe(
+                            switchMap((response) => {
+                                const byteArray = convertBufferToByteArray(response);
+                                const startBit = 4 * 8;
 
-                    return from(combined);
-                }),
-            );
+                                const states = byteArray.slice(startBit, startBit + 12);
+
+                                const combined = states
+                                    .reduce((acc, state, index) => {
+                                        const output = module
+                                            .outputs
+                                            .find((outputItem) => {
+                                                return outputItem.address === index;
+                                            });
+
+                                        if (!output) {
+                                            return acc;
+                                        }
+
+                                        let out: IOutputState = {
+                                            output,
+                                            powered: !!state,
+                                        }
+
+                                        if (output.dimmable && out.powered) {
+                                            out.brightness = state;
+                                        }
+
+                                        acc.push(out);
+
+                                        return acc;
+                                    }, [] as IOutputState[]);
+
+                                return from(combined);
+                            }),
+                        );
+                })
+            )
     }
 
     private action (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number, brightness?: number): Observable<null> {

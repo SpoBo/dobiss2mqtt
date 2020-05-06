@@ -5,6 +5,7 @@ import { IDobiss2MqttModule, ModuleType } from '../config';
 
 import ObservableInspector from '../test/ObservableInspector';
 import fnObservable from '../test/fnObservable';
+import { from } from 'rxjs';
 
 describe("protocols/SX", function() {
 
@@ -66,14 +67,14 @@ describe("protocols/SX", function() {
 
                 let instance: SX;
                 beforeEach(function() {
-                    instance = new SX({ socketClient: client })
+                    instance = new SX({ socketClient: client, modules$: from(modules) })
                 })
 
                 describe("when we poll the first module", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const poll$ = instance
-                            .pollModule(modules[0])
+                            .pollModule(1)
 
                         result = new ObservableInspector(poll$)
                     })
@@ -245,7 +246,7 @@ describe("protocols/SX", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const poll$ = instance
-                            .pollModule(modules[1])
+                            .pollModule(2)
 
                         result = new ObservableInspector(poll$)
                     })
@@ -336,7 +337,7 @@ describe("protocols/SX", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const on$ = instance
-                            .on(modules[0], modules[0].outputs[1])
+                            .on(1, 1)
 
                         result = new ObservableInspector(on$)
                     })
@@ -455,7 +456,7 @@ describe("protocols/SX", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const on$ = instance
-                            .off(modules[1], modules[1].outputs[0])
+                            .off(2, 0)
 
                         result = new ObservableInspector(on$)
                     })
@@ -500,7 +501,7 @@ describe("protocols/SX", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const on$ = instance
-                            .on(modules[1], modules[1].outputs[0], 50)
+                            .on(2, 0, 5)
 
                         result = new ObservableInspector(on$)
                     })
@@ -534,17 +535,16 @@ describe("protocols/SX", function() {
                 })
 
 
-                describe('when we ask to dim the first output of the second module to 2%', function() {
-
+                describe('when we ask to dim the first output of the second module to 20%', function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const on$ = instance
-                            .on(modules[1], modules[1].outputs[0], 2)
+                            .on(2, 0, 2)
 
                         result = new ObservableInspector(on$)
                     })
 
-                    test("it should have sent the correct request to the socket to dim to 3% because 2 is toggle", function() {
+                    test("it should have sent the correct request to the socket to dim to 20", function() {
                         expect(client.request).toHaveBeenCalledWith(
                             Buffer.from([
                                 0xED,
@@ -566,7 +566,7 @@ describe("protocols/SX", function() {
 
                                 0x42, // second module
                                 0x00, // first output
-                                0x03, // turn on to 3%
+                                0x14, // turn on to 20
                             ])
                         )
                     });

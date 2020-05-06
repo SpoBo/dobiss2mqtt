@@ -87,66 +87,59 @@ const processor$ = combineLatest(
             // Create the MQTT client which will also kick into gear when we need it.
             const mqttClient = new RxMqtt(mqttConfig.url);
 
-            const relaysWithMQTTConfig$ = configManager
+            const relaysWithMQTTConfig$ = dobiss
                 .modules$
                 .pipe(
-                    map((modules) => {
-                        return modules
-                        .map((module) => {
-                            return {
-                                ...module,
-                                outputs: module
-                                    .outputs
-                                    .map((output) => {
-                                        const outputId = `output_${module.address}x${output.address}`;
-                                        const id = `${canIdentifier}_${outputId}`;
+                    map((module) => {
+                        return {
+                            ...module,
+                            outputs: module
+                                .outputs
+                                .map((output) => {
+                                    const outputId = `output_${module.address}x${output.address}`;
+                                    const id = `${canIdentifier}_${outputId}`;
 
-                                        const config: HassLightConfig = {
-                                            "cmd_t": `~/set`,
-                                            "device": {
-                                                identifiers: [
-                                                    `${DOBISS_NAMESPACE}_${outputId}`,
-                                                ],
-                                                manufacturer: "Dobiss",
-                                                name: output.name,
-                                                /* eslint-disable-next-line @typescript-eslint/camelcase */
-                                                via_device: canIdentifier,
-                                            },
-                                            "name": output.name,
-                                            "optimistic": false,
-                                            "schema": "json",
-                                            "stat_t": `~/state`,
-                                            "unique_id": id,
-                                            "~": `homeassistant/light/${id}`,
-                                            "brightness": output.dimmable
-                                        };
+                                    const config: HassLightConfig = {
+                                        "cmd_t": `~/set`,
+                                        "device": {
+                                            identifiers: [
+                                                `${DOBISS_NAMESPACE}_${outputId}`,
+                                            ],
+                                            manufacturer: "Dobiss",
+                                            name: output.name,
+                                            /* eslint-disable-next-line @typescript-eslint/camelcase */
+                                            via_device: canIdentifier,
+                                        },
+                                        "name": output.name,
+                                        "optimistic": false,
+                                        "schema": "json",
+                                        "stat_t": `~/state`,
+                                        "unique_id": id,
+                                        "~": `homeassistant/light/${id}`,
+                                        "brightness": output.dimmable
+                                    };
 
-                                        if (output.dimmable) {
-                                            config["brightness_scale"] = 100;
-                                        }
+                                    if (module.brightnessScale && output.dimmable) {
+                                        config["brightness_scale"] = module.brightnessScale;
+                                    }
 
-                                        return {
-                                            ...output,
-                                            config,
-                                        };
-                                    }),
-                            };
-                        });
+                                    return {
+                                        ...output,
+                                        config,
+                                    };
+                                }),
+                        };
                     }),
                 );
 
             const relays$ = relaysWithMQTTConfig$
                 .pipe(
-                    switchMap((modules) => {
-                        // This will contain an observable per relay.
-                        // That observable will manage everything for all outputs on that relay.
-                        // Discovery, listening to MQTT, emitting states on statechange, etc.
-                        const observables = modules
-                            .map((module) => {
-                                const manualPing$ = new Subject();
+                    // NOTE: We might need to group by module address and switchMap on that
+                    mergeMap((module) => {
+                        const manualPing$ = new Subject();
 
-                                const actionRequests$ = merge(
-                                    ...module.outputs
+                        const actionRequests$ = merge(
+                            ...module.outputs
                                         .map((output) => {
                                             return mqttClient
                                                 .subscribe$(output.config.cmd_t.replace("~", output.config["~"]))
@@ -298,11 +291,7 @@ const processor$ = combineLatest(
                                         switchMapTo(config$),
                                     )
 
-                                return merge(periodicConfig$, actionRequests$, outputStates$);
-                            });
-
-                        return merge(...observables);
-                    }),
+                                return merge(periodicConfig$, actionRequests$, outputStates$);                    }),
                 );
 
             return merge(

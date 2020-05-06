@@ -1,6 +1,6 @@
 import { from, Observable } from "rxjs";
 
-import { map } from "rxjs/operators";
+import { map, mergeMap } from "rxjs/operators";
 
 import convict from "convict";
 
@@ -219,12 +219,12 @@ export default class ConfigManager {
      * TODO: Refactor to be Observable<IDobiss2MqttModule>
      *       Eg: no array.
      */
-    public get modules$(): Observable<IDobiss2MqttModule[]> {
+    public get modules$(): Observable<IDobiss2MqttModule> {
         return this.config$
             .pipe(
                 map((config) => config.get("modules") as IConfigModule[]),
-                map((modules) => {
-                    return modules
+                mergeMap((modules) => {
+                    const mapped = modules
                         .map((module, index) => {
                             return {
                                 address: !module.address ? index + 1 : module.address,
@@ -240,6 +240,8 @@ export default class ConfigManager {
                                 type: module.type,
                             };
                         });
+
+                    return from(mapped)
                 }),
             );
     }

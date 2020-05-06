@@ -16,8 +16,11 @@ import {
 } from "../dobissSelector";
 
 import {
-    mergeMap
+    mergeMap,
+    map,
+    switchMap
 } from "rxjs/operators";
+import withModuleAndOutput from "../operators/withModuleAndOutput";
 
 enum ACTION_TYPES {
     toggle = 0x02,
@@ -36,55 +39,88 @@ type ModuleState = {
  * When polling the interface it will return whatever is saved.
  */
 export default class Fake implements IDobissProtocol {
-    private modules$: Observable<IDobiss2MqttModule[]>;
+    private _modules$: Observable<IDobiss2MqttModule>;
 
     private states: Map<string, ModuleState>
 
-    constructor({ modules$ }: { modules$: Observable<IDobiss2MqttModule[]> }) {
-        this.modules$ = modules$;
+    constructor({ modules$ }: { modules$: Observable<IDobiss2MqttModule> }) {
+        this._modules$ = modules$;
         this.states = new Map()
     }
 
-    public off (module: IDobiss2MqttModule, output: IDobiss2MqttOutput): Observable<null> {
-        return this.setState(module, output, ACTION_TYPES.off);
-    }
-
-    public on (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, brightness?: number): Observable<null> {
-        return this.setState(module, output, ACTION_TYPES.on, brightness);
-    }
-
-    public pollModule (module: IDobiss2MqttModule): Observable<IOutputState> {
+    public off (moduleAddress: number, outputAddress: number): Observable<null> {
         return this.modules$
             .pipe(
-                mergeMap(modules => {
-                    return from(modules)
+                withModuleAndOutput(moduleAddress, outputAddress),
+                switchMap(([ module, output ]) => {
+                    if (output) {
+                        return this.setState(module, output, ACTION_TYPES.off);
+                    }
+
+                    return empty()
+                })
+            )
+    }
+
+    public on (moduleAddress: number, outputAddress: number, brightness?: number): Observable<null> {
+        return this.modules$
+            .pipe(
+                withModuleAndOutput(moduleAddress, outputAddress),
+                switchMap(([ module, output ]) => {
+                    if (output) {
+                        return this.setState(module, output, ACTION_TYPES.on, brightness);
+                    }
+
+                    return empty()
+                })
+            )
+    }
+
+    public pollModule (moduleAddress: number): Observable<IOutputState> {
+        return this.modules$
+            .pipe(
+                withModuleAndOutput(moduleAddress),
+                switchMap(([ module ]) => {
+                    if (module.address !== moduleAddress) {
+                        return empty();
+                    }
+
+                    return from(module.outputs)
                         .pipe(
-                            mergeMap(currentModule => {
-                                if (currentModule.address !== module.address) {
-                                    return empty();
+                            mergeMap(output => {
+                                const key = `${module.address}_${output.address}`
+                                const state = this.states.get(key)
+
+                                const result: IOutputState = {
+                                    output,
+                                    powered: !!(state?.powered),
                                 }
 
-                                return from(module.outputs)
-                                    .pipe(
-                                        mergeMap(output => {
-                                            const key = `${module.address}_${output.address}`
-                                            const state = this.states.get(key)
 
-                                            const result: IOutputState = {
-                                                output,
-                                                powered: !!(state?.powered),
-                                            }
+                                if (output.dimmable) {
+                                    result.brightness = state?.brightness
+                                }
 
-
-                                            if (output.dimmable) {
-                                                result.brightness = state?.brightness
-                                            }
-
-                                            return of(result)
-                                        }),
-                                    )
+                                return of(result)
                             }),
                         )
+                }),
+
+            )
+    }
+
+    get modules$(): Observable<IDobiss2MqttModule> {
+        return this._modules$
+            .pipe(
+                map((module) => {
+                    if (module.type === 'dimmer') {
+                        return {
+                            ...module,
+                            brightnessScale: 10
+                        };
+                    }
+
+                    return module;
                 })
             )
     }

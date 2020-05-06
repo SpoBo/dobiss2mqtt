@@ -2,11 +2,13 @@ import {
     concat,
     from,
     Observable,
+    empty,
 } from "rxjs";
 
 import {
     mapTo,
     switchMap,
+    map,
 } from "rxjs/operators";
 
 import RxSocket, { IRequestResponseBuffer } from "../rx-socket";
@@ -19,16 +21,20 @@ import {
 import {
     IDobissProtocol,
     IOutputState,
+    IDobiss2MqttModuleOnDobiss,
 } from "../dobissSelector";
 
 import {
     convertBufferToByteArray,
 } from "../helpers";
+import withModuleAndOutput from "../operators/withModuleAndOutput";
 
 enum ACTION_TYPES {
     on = 0x01,
     off = 0x00,
 }
+
+const BRIGHTNESS_SCALE = 10
 
 function convertModuleToModuleId(module: IDobiss2MqttModule) {
     return module.address + 64;
@@ -58,24 +64,68 @@ function createOutputsBuffer({ batch, moduleId }: { batch: IDobiss2MqttOutput[];
 
 export default class SX implements IDobissProtocol {
 
+    // TODO: use moduleSelectorHelper to allow accepting just the address numbers for module and output.
+
     private socketClient: IRequestResponseBuffer;
+    private _modules$: Observable<IDobiss2MqttModule>;
 
-    constructor({ socketClient }: { socketClient: IRequestResponseBuffer }) {
+    constructor({ socketClient, modules$ }: { socketClient: IRequestResponseBuffer, modules$: Observable<IDobiss2MqttModule> }) {
         this.socketClient = socketClient;
+        this._modules$ = modules$;
     }
 
-    public off (module: IDobiss2MqttModule, output: IDobiss2MqttOutput): Observable<null> {
-        return this.action(module, output, ACTION_TYPES.off);
+    public off (moduleAddress: number, outputAddress: number): Observable<null> {
+        return this.modules$
+            .pipe(
+                withModuleAndOutput(moduleAddress, outputAddress),
+                switchMap(([ module, output ]) => {
+                    if (output) {
+                        return this.action(module, output, ACTION_TYPES.off)
+                    }
+
+                    return empty()
+                })
+            )
     }
 
-    public on (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, brightness?: number): Observable<null> {
-        return this.action(module, output, ACTION_TYPES.on, brightness);
+    /**
+     * @param {number} [brightness]
+     *   Since we configure it to only step to 10 maximum, we will receive a value of 0-10 for brightness.
+     */
+    public on (moduleAddress: number, outputAddress: number, brightness?: number): Observable<null> {
+        return this.modules$
+            .pipe(
+                withModuleAndOutput(moduleAddress, outputAddress),
+                switchMap(([ module, output ]) => {
+                    if (output) {
+                        return this.action(module, output, ACTION_TYPES.on, brightness);
+                    }
+
+                    return empty()
+                })
+            )
+    }
+
+    get modules$(): Observable<IDobiss2MqttModuleOnDobiss> {
+        return this._modules$
+            .pipe(
+                map((module) => {
+                    if (module.type === 'dimmer') {
+                        return {
+                            ...module,
+                            brightnessScale: BRIGHTNESS_SCALE
+                        };
+                    }
+
+                    return module;
+                })
+            )
     }
 
     // TODO: add ability to dim. in that case we set the third argument to a value of 255 relative from 1 to 100.
     //       I wonder if reading the states will also tell how bright the lights are.
 
-    public pollModule (module: IDobiss2MqttModule): Observable<IOutputState> {
+    public pollModule (moduleAddress: number): Observable<IOutputState> {
         // We need to prefix this.
         const baseBuffer = Buffer
             .from([
@@ -97,63 +147,76 @@ export default class SX implements IDobissProtocol {
                0xAF,
             ]);
 
-        // And then we can pack it with 4 digits to get the state of the output.
-        // First 2 digits need to be the module id and the following 2 digits the id of the output.
-        // We can poll up to 24 modules with this mechanism. So if we have more than 24 outputs we need to batch it per 24 outputs.
-        const outputs = module
-            .outputs
-            .reduce((acc, output) => {
-                let current = acc[acc.length - 1];
-                if (!current) {
-                    current = [];
-                    acc.push(current);
-                }
+        return this.modules$
+            .pipe(
+                withModuleAndOutput(moduleAddress),
+                switchMap(([ module ]) => {
+                    const outputs = module
+                        .outputs
+                        .reduce((acc, output) => {
+                            let current = acc[acc.length - 1];
+                            if (!current) {
+                                current = [];
+                                acc.push(current);
+                            }
 
-                if (acc.length < 24) {
-                    current.push(output);
-                }
+                            if (acc.length < 24) {
+                                current.push(output);
+                            }
 
-                return acc;
-            }, [] as IDobiss2MqttOutput[][])
-        .map((batch) => {
-            const outputsBuffer = createOutputsBuffer({ batch, moduleId: convertModuleToModuleId(module) });
+                            return acc;
+                        }, [] as IDobiss2MqttOutput[][])
+                        .map((batch) => {
+                            const outputsBuffer = createOutputsBuffer({ batch, moduleId: convertModuleToModuleId(module) });
 
-            // now we map it to an observable.
-            // NOTE: We need to construct a message where we tell Dobiss to give us the state for every light on this module.
-            const requestBuffer = Buffer.concat([ baseBuffer, outputsBuffer ]);
+                            // now we map it to an observable.
+                            // NOTE: We need to construct a message where we tell Dobiss to give us the state for every light on this module.
+                            const requestBuffer = Buffer.concat([ baseBuffer, outputsBuffer ]);
 
-            return this.socketClient
-                .request(requestBuffer)
-                .pipe(
-                    switchMap((response) => {
-                        const states = convertBufferToByteArray(response);
+                            return this.socketClient
+                                .request(requestBuffer)
+                                .pipe(
+                                    switchMap((response) => {
+                                        const states = convertBufferToByteArray(response);
 
-                        const combined = states
-                            .reduce((acc, state, index) => {
-                                const output = module
-                                    .outputs
-                                    .find((outputItem) => {
-                                        return outputItem.address === index;
-                                    });
+                                        const combined = states
+                                            .reduce((acc, state, index) => {
+                                                const output = module
+                                                    .outputs
+                                                    .find((outputItem) => {
+                                                        return outputItem.address === index;
+                                                    });
 
-                                if (!output) {
-                                    return acc;
-                                }
 
-                                acc.push({
-                                    output,
-                                    powered: !!state,
-                                });
+                                                if (!output) {
+                                                    return acc;
+                                                }
 
-                                return acc;
-                            }, [] as IOutputState[]);
+                                                const result: IOutputState = {
+                                                    output,
+                                                    powered: !!state,
+                                                }
 
-                        return from(combined);
-                    }),
-                );
-        });
+                                                if (output.dimmable && module.brightnessScale) {
+                                                    result.brightness = (state - (state % module.brightnessScale)) / module.brightnessScale
+                                                }
 
-        return concat(...outputs);
+                                                acc.push(result);
+
+                                                return acc;
+                                            }, [] as IOutputState[]);
+
+                                        return from(combined);
+                                    }),
+                                );
+                        });
+
+                    // And then we can pack it with 4 digits to get the state of the output.
+                    // First 2 digits need to be the module id and the following 2 digits the id of the output.
+                    // We can poll up to 24 modules with this mechanism. So if we have more than 24 outputs we need to batch it per 24 outputs.
+                    return concat(...outputs);
+                })
+            )
     }
 
     private action (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number, brightness?: number): Observable<null> {
@@ -196,12 +259,5 @@ function getActionValue(actionType: number, dimmable: boolean, brightness?: numb
         return actionType
     }
 
-    const suggested = brightness ?? (actionType === ACTION_TYPES.on ? 100 : 0)
-
-    // Can't deal with 2% as it is toggling on SX.
-    if (suggested === 2) {
-        return 3
-    }
-
-    return suggested
+    return (brightness ?? (actionType === ACTION_TYPES.on ? 10 : 0)) * BRIGHTNESS_SCALE
 }

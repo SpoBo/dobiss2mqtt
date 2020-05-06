@@ -50,6 +50,8 @@ Set dobiss.interface to SXAMBIANCE
 
 Currently this is linked to the same protocol as SXAMBIANCE. This might not be working correctly.
 
+SX has a dimmer range going from 0 to 10. So brightness changes in steps of 10%.
+
 ### Ambiance PRO
 Set dobiss.interface to AMBIANCEPRO
 

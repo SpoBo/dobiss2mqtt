@@ -29,8 +29,8 @@ enum ACTION_TYPES {
 }
 
 type ModuleState = {
-   powered: boolean,
-   brightness?: number
+   powered: boolean;
+   brightness?: number;
 }
 
 /**

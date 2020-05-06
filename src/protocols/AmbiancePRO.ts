@@ -60,7 +60,7 @@ type SimpleActionBufferOptions = {
     moduleAddress: number;
     outputAddress: number;
     actionType: ACTION_TYPES;
-    brightness?: number
+    brightness?: number;
 };
 
 function convertModuleTypeToNumber(moduleType: ModuleType): number {
@@ -137,7 +137,7 @@ export default class AmbiancePRO implements IDobissProtocol {
     private socketClient: IRequestResponseBuffer;
     private _modules$: Observable<IDobiss2MqttModule>;
 
-    constructor({ socketClient, modules$ }: { socketClient: IRequestResponseBuffer, modules$: Observable<IDobiss2MqttModule> }) {
+    constructor({ socketClient, modules$ }: { socketClient: IRequestResponseBuffer; modules$: Observable<IDobiss2MqttModule> }) {
         this.socketClient = socketClient;
         this._modules$ = modules$;
     }
@@ -219,7 +219,7 @@ export default class AmbiancePRO implements IDobissProtocol {
                                             return acc;
                                         }
 
-                                        let out: IOutputState = {
+                                        const out: IOutputState = {
                                             output,
                                             powered: !!state,
                                         }

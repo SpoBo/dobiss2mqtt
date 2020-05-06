@@ -22,11 +22,11 @@ export type IOutputState = {
  * For example, brightnessScale is 10 on SX while it is 100 on Ambiance.
  */
 export interface IDobiss2MqttModuleOnDobiss extends IDobiss2MqttModule {
-    brightnessScale?: number
+    brightnessScale?: number;
 }
 
 export interface IDobissModulesConfig {
-    modules$: Observable<IDobiss2MqttModuleOnDobiss>
+    modules$: Observable<IDobiss2MqttModuleOnDobiss>;
 }
 
 export interface IDobissProtocol extends IDobissModulesConfig {

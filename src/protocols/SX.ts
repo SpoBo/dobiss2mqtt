@@ -40,6 +40,14 @@ function convertModuleToModuleId(module: IDobiss2MqttModule) {
     return module.address + 64;
 }
 
+function getActionValue(actionType: number, dimmable: boolean, brightness?: number): number {
+    if (!dimmable) {
+        return actionType
+    }
+
+    return (brightness ?? (actionType === ACTION_TYPES.on ? 10 : 0)) * BRIGHTNESS_SCALE
+}
+
 function createOutputsBuffer({ batch, moduleId }: { batch: IDobiss2MqttOutput[]; moduleId: number }): Buffer {
     // If there are not 24 modules we need to padd up the rest with 0xFF
     // So let's make sure we pad it if the batch is too small.
@@ -69,7 +77,7 @@ export default class SX implements IDobissProtocol {
     private socketClient: IRequestResponseBuffer;
     private _modules$: Observable<IDobiss2MqttModule>;
 
-    constructor({ socketClient, modules$ }: { socketClient: IRequestResponseBuffer, modules$: Observable<IDobiss2MqttModule> }) {
+    constructor({ socketClient, modules$ }: { socketClient: IRequestResponseBuffer; modules$: Observable<IDobiss2MqttModule> }) {
         this.socketClient = socketClient;
         this._modules$ = modules$;
     }
@@ -254,10 +262,3 @@ export default class SX implements IDobissProtocol {
 }
 
 
-function getActionValue(actionType: number, dimmable: boolean, brightness?: number): number {
-    if (!dimmable) {
-        return actionType
-    }
-
-    return (brightness ?? (actionType === ACTION_TYPES.on ? 10 : 0)) * BRIGHTNESS_SCALE
-}

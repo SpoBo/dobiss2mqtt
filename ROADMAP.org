@@ -2,6 +2,7 @@
 * DONE [#B] Support Dimmers
 Should be supported for SX & Ambiance PRO.
 Verified with the Fake dobiss interface that dimming protocol towards HASS is supported correctly.
+* TODO ARM builds
 * DONE [#A] Implement [[https://github.com/mozilla/node-convict][Convict]] for the config
 Also rework how we do the config.
 

@@ -1,3 +1,5 @@
+ARG ARCH=
+
 # Use node to build the typescript stuff.
 FROM node as builder
 
@@ -16,7 +18,7 @@ RUN npm run build
 RUN npm prune --production
 
 # second stage will be a new clean image in which we will drop the node_modules and the built dist folder
-FROM node:slim as runtime
+FROM ${ARCH}node:slim as runtime
 
 WORKDIR /app
 

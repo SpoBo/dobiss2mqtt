@@ -1,5 +1,6 @@
 import DEBUG from "debug";
 import ms from "ms";
+import arp from "@network-utils/arp-lookup";
 
 import {
     combineLatest,
@@ -9,6 +10,7 @@ import {
     of,
     Subject,
     timer,
+    from,
 } from "rxjs";
 
 import {
@@ -30,6 +32,8 @@ import ConfigManager from "./config";
 import dobissSelector from "./dobissSelector";
 
 import RxSocket from "./rx-socket";
+import { IDobissConfig, IMqttConfig } from './config';
+import { Observable } from 'rxjs';
 
 const DOBISS_NAMESPACE = "dobiss";
 
@@ -65,6 +69,11 @@ type HassLightState = {
     brightness?: number;
 }
 
+type Config = {
+    dobissConfig: IDobissConfig;
+    mqttConfig: IMqttConfig;
+}
+
 /**
  * I know this is overkill.
  */
@@ -73,7 +82,19 @@ const processor$ = combineLatest(
         configManager.mqtt$,
     )
     .pipe(
-        switchMap(([ dobissConfig, mqttConfig ]) => {
+        switchMap(([ dobissConfig, mqttConfig ]): Observable<Config> => {
+            if (dobissConfig.host) {
+                return of({dobissConfig, mqttConfig});
+            } else {
+                return from(arp.getTable()).pipe(
+                    map((arpTabel) => {
+                        dobissConfig.host = arpTabel.find(x => x.vendor === 'Arm')?.ip ?? '192.168.0.10';
+                        return {dobissConfig, mqttConfig};
+                    }),
+                );
+            }
+        }),
+        switchMap(({dobissConfig, mqttConfig}: Config) => {
             const canIdentifier = `${DOBISS_NAMESPACE}_mqtt_${dobissConfig.host.replace(/\./g, "_")}`;
 
             // Create a SocketClient which will kick into gear when we need it.

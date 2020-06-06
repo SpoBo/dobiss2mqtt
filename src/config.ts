@@ -94,7 +94,7 @@ export enum DobissInterfaceTypes {
 const CONVICT_SCHEMA = {
     dobiss: {
         host: {
-            default: "192.168.0.10",
+            default: undefined,
             doc: "The IP address on which the CAN Programmer is working.",
             env: "DOBISS_HOST",
             format: "ipaddress",
@@ -205,7 +205,7 @@ export default class ConfigManager {
 
     private get config$() {
         const config = convict(CONVICT_SCHEMA).loadFile(this.location);
-
+        
         config.validate();
 
         // TODO: Figure out how to grab the type of Convict

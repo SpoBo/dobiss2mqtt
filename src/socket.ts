@@ -20,33 +20,12 @@ export default function socket (opts: SocketConnectOpts): Observable<Socket> {
         client
             .connect(opts);
 
-        client.on("close", () => {
-            debug("close");
-        });
-
-        client.on("data", (d) => {
-            debug("data %o", d);
-        });
-
-        client.on("drain", () => {
-            debug("drain");
-        });
-
-        client.on("end", () => {
-            debug("end");
-        });
+        client
+            .setMaxListeners(50)
 
         client.on("error", (e) => {
             debug("error", e.message);
             subscriber.error(e);
-        });
-
-        client.on("lookup", () => {
-            debug("lookup");
-        });
-
-        client.on("timeout", () => {
-            debug("timeout");
         });
 
         client.on("connect", () => {

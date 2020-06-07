@@ -10,7 +10,7 @@ module.exports = {
     mqtt: {
         // TODO: When tweaking authentication support for MQTT look into how we can add other parameters.
         //       I prefer something which just maps 1:1.
-        url: 'mqtt://host'
+        url: 'mqtt://username:password@host'
     },
     // Can also be 0 to fully disable automated polling.
     // It will then only poll once after every action.

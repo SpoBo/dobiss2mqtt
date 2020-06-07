@@ -4,6 +4,8 @@ import { map, mergeMap, switchMap } from 'rxjs/operators';
 import convict from "convict";
 import arp from "@network-utils/arp-lookup";
 
+const debug = DEBUG('dobiss2mqtt.config')
+
 // I like JS config so sue me.
 convict.addParser({
     extension: "js",
@@ -261,13 +263,15 @@ export default class ConfigManager {
                         return of(config);
                     } else {
                         return from(arp.getTable()).pipe(
-                            map((arpTabel) => {
-                                const dobissIp = arpTabel.find(x => x.vendor === 'Arm')?.ip;
+                            map((arpTable) => {
+                                debug('arp table %j', arpTable)
+
+                                const dobissIp = arpTable.find(x => x.vendor === 'Arm')?.ip;
                                 if (!dobissIp) {
                                     throw new TypeError('Dobiss programmer is not auto discovered');
                                 }
 
-                                DEBUG(`found dobiss programmer on ${dobissIp}`);
+                                debug(`found dobiss programmer on ${dobissIp}`);
                                 config.host = dobissIp as string;
                                 return config;
                             }),

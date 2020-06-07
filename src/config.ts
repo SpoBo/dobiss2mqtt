@@ -1,8 +1,8 @@
-import { from, Observable } from "rxjs";
-
-import { map, mergeMap } from "rxjs/operators";
-
+import DEBUG from "debug";
+import { from, Observable, of } from "rxjs";
+import { map, mergeMap, switchMap } from 'rxjs/operators';
 import convict from "convict";
+import arp from "@network-utils/arp-lookup";
 
 // I like JS config so sue me.
 convict.addParser({
@@ -255,6 +255,24 @@ export default class ConfigManager {
             .pipe(
                 map((config) => {
                     return config.get("dobiss") as IDobissConfig;
+                }),
+                switchMap((config: IDobissConfig): Observable<IDobissConfig> => {
+                    if (config.host) {
+                        return of(config);
+                    } else {
+                        return from(arp.getTable()).pipe(
+                            map((arpTabel) => {
+                                const dobissIp = arpTabel.find(x => x.vendor === 'Arm')?.ip;
+                                if (!dobissIp) {
+                                    throw new TypeError('Dobiss programmer is not auto discovered');
+                                }
+
+                                DEBUG(`found dobiss programmer on ${dobissIp}`);
+                                config.host = dobissIp as string;
+                                return config;
+                            }),
+                        );
+                    }
                 }),
             );
     }

@@ -21,7 +21,7 @@ RUN npm prune --production
 FROM ${ARCH}node:slim as runtime
 
 RUN apt-get update && apt-get install -y \
-  net-tools
+  nmap
 
 WORKDIR /app
 

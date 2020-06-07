@@ -1,10 +1,11 @@
 import DEBUG from "debug";
-import { from, Observable, of } from "rxjs";
+import { from, Observable, of, Subject } from 'rxjs';
 import { map, mergeMap, switchMap } from 'rxjs/operators';
 import convict from "convict";
-import arp from "@network-utils/arp-lookup";
+import { networkInterfaces } from 'os';
+import { spawn } from "child_process";
 
-const debug = DEBUG('dobiss2mqtt.config')
+const debug = DEBUG('dobiss2mqtt.config');
 
 // I like JS config so sue me.
 convict.addParser({
@@ -262,11 +263,50 @@ export default class ConfigManager {
                     if (config.host) {
                         return of(config);
                     } else {
-                        return from(arp.getTable()).pipe(
-                            map((arpTable) => {
-                                debug('arp table %j', arpTable)
+                        const subject = new Subject();
+                        const interfaces = networkInterfaces();
+                        const cidr: string[] = [];
+                        Object.entries(interfaces).forEach(
+                            ([key, value]) => {
+                                value?.filter((x) => x.family === 'IPv4' && !x.internal).forEach((value) => {
+                                    debug(`ip interace found: ${key}`);
+                                    cidr.push(value.cidr ?? '');
+                                });
+                            }
+                        );
 
-                                const dobissIp = arpTable.find(x => x.vendor === 'Arm')?.ip;
+                        debug(`checking following networks ${cidr.join(' ')}`);
+                        
+                        const nmap = spawn('nmap', (["-sP", ...cidr]));
+                        let result = '';
+
+                        nmap.stdout.on("data", (data) => {
+                            result += data;
+                        });
+
+                        nmap.stderr.on("data", () => {
+                            debug('auto discovery of dobiss programmer failed');
+                        });
+                        
+                        nmap.on('error', () => {
+                            debug('auto discovery of dobiss programmer failed');
+                        });
+
+                        nmap.on('close', () => {
+                            subject.next(true);
+                        });
+
+                        return subject.pipe(
+                            map(() => {
+                                debug('nmap', result);
+                                const regex = /Nmap scan report for ([^(\n|\r)]*)(?:\n|[^N])*..:..:..:..:..:.. \(ARM\)/g;
+                                const armIp = regex.exec(result);
+                                
+                                let dobissIp = ''
+                                if (armIp) {
+                                    dobissIp = armIp[1] ?? '';
+                                }
+
                                 if (!dobissIp) {
                                     throw new TypeError('Dobiss programmer is not auto discovered');
                                 }

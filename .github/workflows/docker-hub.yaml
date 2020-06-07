@@ -1,4 +1,4 @@
-name: build image
+name: build docker image multi-arch via buildx
 
 on:
   push:
@@ -14,7 +14,11 @@ jobs:
         id: buildx
         uses: crazy-max/ghaction-docker-buildx@v1
         with:
-          version: latest
+          buildx-version: latest
+          skip-cache: false
+          qemu-version: latest
+      - name: list available platforms
+        run: echo ${{ steps.buildx.outputs.platforms }}
       - name: login to docker hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
       - name: build the image

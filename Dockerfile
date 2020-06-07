@@ -20,6 +20,9 @@ RUN npm prune --production
 # second stage will be a new clean image in which we will drop the node_modules and the built dist folder
 FROM ${ARCH}node:slim as runtime
 
+RUN apt-get update && apt-get install -y \
+  net-tools
+
 WORKDIR /app
 
 ENV NODE_ENV=production

@@ -263,19 +263,29 @@ export default class ConfigManager {
                     if (config.host) {
                         return of(config);
                     } else {
+                        // NOTE: Should split this out in a discovery interface to look for a specific host.
                         const subject = new Subject();
                         const interfaces = networkInterfaces();
-                        const cidr: string[] = [];
-                        Object.entries(interfaces).forEach(
-                            ([key, value]) => {
-                                value?.filter((x) => x.family === 'IPv4' && !x.internal).forEach((value) => {
-                                    debug(`ip interace found: ${key}`);
-                                    cidr.push(value.cidr ?? '');
-                                });
-                            }
-                        );
 
-                        debug(`checking following networks ${cidr.join(' ')}`);
+                        const cidr = Object
+                            .values(interfaces)
+                            .reduce(
+                                (acc, value) => {
+                                    if (!value) {
+                                        return acc;
+                                    }
+
+                                    const cidrs = value
+                                        .filter((x) => x.family === 'IPv4' && !x.internal && x.cidr)
+                                        .map(x => x.cidr as string);
+
+                                    debug('ip interaces found: %j', cidrs);
+                                    return acc.concat(cidrs)
+                                },
+                                [] as string[]
+                            );
+
+                        debug('checking following networks %j', cidr);
                         
                         const nmap = spawn('nmap', (["-sP", ...cidr]));
                         let result = '';
@@ -284,16 +294,18 @@ export default class ConfigManager {
                             result += data;
                         });
 
-                        nmap.stderr.on("data", () => {
-                            debug('auto discovery of dobiss programmer failed');
+                        nmap.stderr.on("data", (e) => {
+                            debug('auto discovery of dobiss programmer failed %s', e);
                         });
                         
-                        nmap.on('error', () => {
-                            debug('auto discovery of dobiss programmer failed');
+                        nmap.on('error', (e) => {
+                            debug('auto discovery of dobiss programmer failed %s', e);
+                            subject.error(e)
                         });
 
                         nmap.on('close', () => {
                             subject.next(true);
+                            subject.complete();
                         });
 
                         return subject.pipe(
@@ -302,18 +314,17 @@ export default class ConfigManager {
                                 const regex = /Nmap scan report for ([^(\n|\r)]*)(?:\n|[^N])*..:..:..:..:..:.. \(ARM\)/g;
                                 const armIp = regex.exec(result);
                                 
-                                let dobissIp = ''
+                                let dobissIp;
                                 if (armIp) {
                                     dobissIp = armIp[1] ?? '';
                                 }
 
                                 if (!dobissIp) {
-                                    throw new TypeError('Dobiss programmer is not auto discovered');
+                                    throw new Error('CAN Programmer is not auto discovered. Please manually set dobiss.ip config to the IP of your CAN Controller.');
                                 }
 
-                                debug(`found dobiss programmer on ${dobissIp}`);
-                                config.host = dobissIp as string;
-                                return config;
+                                debug(`found CAN Programmer on ${dobissIp}`);
+                                return { ...config, host: dobissIp };
                             }),
                         );
                     }

@@ -63,7 +63,9 @@ Currently this is linked to the same protocol as AMBIANCEPRO. This might not be 
 ### NXT
 Set dobiss.interface to NXT.
 
-Currently this is linked to the same protocol as AMBIANCEPRO. This might not be working correctly.
+Currently this is linked to the same protocol as AMBIANCEPRO. This might not be working correctly. Perhaps NXT also implements this older protocol. Let me know if this does not work.
+
+It appears NXT works via a [new API](http://support.dobiss.com/books/nl-dobiss-nxt/page/developer-api) via REST and WebSockets. This is not implemented currently. If you have an NXT system, and are not affraid to dig into the code a little bit, reach out on the [home assistant community](https://community.home-assistant.io/t/dobiss2mqtt/192310) and we can help you integrate it.
 
 ## Installation
 

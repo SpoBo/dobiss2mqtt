@@ -30,7 +30,7 @@ enum ACTION_TYPES {
 
 type ModuleState = {
    powered: boolean;
-   brightness?: number;
+   level?: number;
 }
 
 /**
@@ -62,13 +62,14 @@ export default class Fake implements IDobissProtocol {
             )
     }
 
-    public on (moduleAddress: number, outputAddress: number, brightness?: number): Observable<null> {
+    public on (moduleAddress: number, outputAddress: number, level?: number): Observable<null> {
+        console.log('setting', { moduleAddress, outputAddress, level })
         return this.modules$
             .pipe(
                 withModuleAndOutput(moduleAddress, outputAddress),
                 switchMap(([ module, output ]) => {
                     if (output) {
-                        return this.setState(module, output, ACTION_TYPES.on, brightness);
+                        return this.setState(module, output, ACTION_TYPES.on, level);
                     }
 
                     return empty()
@@ -98,7 +99,7 @@ export default class Fake implements IDobissProtocol {
 
 
                                 if (output.dimmable) {
-                                    result.brightness = state?.brightness
+                                    result.level = state?.level
                                 }
 
                                 return of(result)
@@ -125,9 +126,9 @@ export default class Fake implements IDobissProtocol {
             )
     }
 
-    private setState (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number, brightness?: number): Observable<null> {
+    private setState (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number, level?: number): Observable<null> {
         const key = `${module.address}_${output.address}`;
-        const value = { powered: actionType === ACTION_TYPES.on, brightness: actionType === ACTION_TYPES.on ? brightness ?? 100 : 0 };
+        const value = { powered: actionType === ACTION_TYPES.on, level: actionType === ACTION_TYPES.on ? level ?? 100 : 0 };
         this.states.set(key, value)
         return of(null)
     }

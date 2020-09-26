@@ -234,7 +234,7 @@ export default class ConfigManager {
                                         return {
                                             address: outputIndex,
                                             name,
-                                            dimmable: module.type === ModuleType.dimmer
+                                            dimmable: module.type === ModuleType.dimmer || module.type === ModuleType.volt
                                         };
                                     }),
                                 type: module.type,

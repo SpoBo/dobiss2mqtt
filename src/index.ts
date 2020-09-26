@@ -227,7 +227,7 @@ const processor$ = combineLatest(
                                                 .pipe(
                                                     // Only continue when the state effectively changed.
                                                     distinctUntilChanged((a, b) => {
-                                                        return a.powered === b.powered && a.brightness === b.brightness;
+                                                        return a.powered === b.powered && a.level === b.level;
                                                     }),
                                                     tap({
                                                         next(a) {
@@ -248,7 +248,7 @@ const processor$ = combineLatest(
                                                         }
 
                                                         if (output.dimmable) {
-                                                            state.brightness = update.brightness ?? 0
+                                                            state.brightness = update.level ?? 0
                                                         }
 
                                                         const payload = JSON.stringify(state);

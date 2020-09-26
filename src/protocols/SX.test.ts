@@ -330,6 +330,33 @@ describe("protocols/SX", function() {
                             ])
                         )
                     });
+
+                    describe('when we return with a state indicating the first output is off and the second one is on', function() {
+                         beforeEach(function() {
+                            return clientControl
+                                .next(
+                                    Buffer.from([
+                                        0x10,
+                                        0x00,
+                                    ])
+                                )
+                        })
+
+                        test("it should have returned 2 messages indicating the first one is off and the second one is on", function() {
+                            expect(result.items).toEqual([
+                                {
+                                    output: modules[1].outputs[0],
+                                    powered: true,
+                                    level: 1
+                                },
+                                {
+                                    output: modules[1].outputs[1],
+                                    powered: false,
+                                    level: 0
+                                },
+                            ])
+                        });
+                    })
                 });
 
                 describe("when we ask to turn on the second output on the first module", function() {

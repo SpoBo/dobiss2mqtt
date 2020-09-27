@@ -160,7 +160,7 @@ const processor$ = combineLatest(
                                                             .pipe(
                                                                 tap({
                                                                     next() {
-                                                                        debug('completed request to set state to %s for module %d and output %d (%s)', request.state, module.address, output.address, output.name)
+                                                                        debug('completed request to set state to %s for module %d and output %d (%s). going to manually poll module states.', request.state, module.address, output.address, output.name)
                                                                         // As a side-effect,
                                                                         // trigger a manual ping on success.
                                                                         manualPing$
@@ -178,7 +178,7 @@ const processor$ = combineLatest(
                                     .pipe(
                                         switchMap((pollInterval) => {
                                             if (!pollInterval) {
-                                                debug("polling disabled")
+                                                debug("polling disabled. will not automatically poll module.")
                                                 return empty()
                                             }
 
@@ -252,11 +252,13 @@ const processor$ = combineLatest(
                                                         }
 
                                                         const payload = JSON.stringify(state);
+                                                        const topic = output.config.stat_t.replace("~", output.config["~"])
+                                                        debug('going to emit new payload of %j for module %d and output %d on topic %s', state, module.address, output.address)
 
                                                         return mqttClient
                                                             .publish$(
                                                                 // TODO: get the configured url for the endpoint.
-                                                                output.config.stat_t.replace("~", output.config["~"]),
+                                                                topic,
                                                                 payload,
                                                                 {
                                                                     qos: 1,

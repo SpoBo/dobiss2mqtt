@@ -25,12 +25,12 @@ export class RxMqtt {
                     const replies$ = d.message$
                         .pipe(
                             filter(([ incomingTopic ]) => incomingTopic === topic),
+                            map(([ _, buffer ]) => buffer.toString()),
                             tap({
-                                next(out) {
-                                    debug("message response for %s is %o", topic, out);
+                                next(msg) {
+                                    debug("got message for topic %s -> %s", topic, msg);
                                 },
                             }),
-                            map(([ _, buffer ]) => buffer.toString()),
                         );
 
                     return concat(subscribe$, replies$);

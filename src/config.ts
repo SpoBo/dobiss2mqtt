@@ -136,7 +136,7 @@ const CONVICT_SCHEMA = {
                 default: "relay",
                 doc: `The type of module it is. Depending on the module the states should be polled
                       and controlled differently.`,
-                format: ["relay", "dimmer", "0-10v"],
+                format: ["relay", "dimmer", "0-10v", "0-10v-dimmer"],
             },
         },
         default: [],
@@ -174,6 +174,7 @@ export enum ModuleType {
     relay = "relay",
     dimmer = "dimmer",
     volt = "0-10v",
+    voltDimmer = "0-10v-dimmer",
 }
 
 export interface IConfigModule {

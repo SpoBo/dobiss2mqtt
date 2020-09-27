@@ -15,7 +15,7 @@
         "start:prod": "NODE_ENV=production node ./dist/index.js"
     },
     "volta": {
-        "node": "13.9.0"
+        "node": "14.11.0"
     },
     "dependencies": {
         "convict": "^5.2.0",

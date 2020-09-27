@@ -1,3 +1,5 @@
+import DEBUG from "debug";
+
 import {
     from,
     Observable,
@@ -29,6 +31,8 @@ import {
 } from "../helpers";
 
 import withModuleAndOutput from "../operators/withModuleAndOutput";
+
+const debug = DEBUG("dobiss2mqtt.protocol.ambiance-pro");
 
 enum ACTION_TYPES {
     toggle = 0x02,
@@ -203,9 +207,11 @@ export default class AmbiancePRO implements IDobissProtocol {
                         .pipe(
                             switchMap((response) => {
                                 const byteArray = convertBufferToByteArray(response);
+                                debug('response of poll for module %d is %s', module.address, byteArray)
                                 const startBit = 4 * 8;
 
                                 const states = byteArray.slice(startBit, startBit + 12);
+                                debug('states for above module poll response %s', states)
 
                                 const combined = states
                                     .reduce((acc, state, index) => {

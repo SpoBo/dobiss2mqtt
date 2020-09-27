@@ -303,6 +303,10 @@ const processor$ = combineLatest(
         }),
     );
 
+// TODO: log ENV var containing the commit hash.
+// TODO: Set that ENV var during Dockerfile build.
+debug('starting up')
+
 processor$
     .pipe(
         catchError((e, obs$) => {

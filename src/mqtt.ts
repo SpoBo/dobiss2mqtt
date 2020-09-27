@@ -69,37 +69,42 @@ export default function mqtt (url: string): Observable<ISimplifiedMqttClient> {
             });
         });
 
-        client.on("reconnect", () => {
-            debug("reconnect");
-        });
+        if (process.env.DEBUG_MQTT_EVENTS) {
+            client.on("reconnect", () => {
+                debug("reconnect");
+            });
 
-        client.on("disconnect", () => {
-            debug("disconnect");
-        });
+            client.on("disconnect", () => {
+                debug("disconnect");
+            });
 
-        client.on("offline", () => {
-            debug("offline");
-        });
+            client.on("offline", () => {
+                debug("offline");
+            });
 
-        client.on("error", () => {
-            debug("error");
-        });
+            client.on("error", () => {
+                debug("error");
+            });
+
+            client.on("message", (msg) => {
+                debug("message", msg);
+            });
+
+            client.on("packetsend", (packet) => {
+                debug("packetsend", packet);
+            });
+
+            client.on("packetreceive", (packet) => {
+                debug("packereceive", packet);
+            });
+        }
 
         client.on("end", () => {
             subscriber.complete();
-            debug("end");
-        });
 
-        client.on("message", (msg) => {
-            debug("message", msg);
-        });
-
-        client.on("packetsend", (packet) => {
-            debug("packetsend", packet);
-        });
-
-        client.on("packetreceive", (packet) => {
-            debug("packereceive", packet);
+            if (process.env.DEBUG_MQTT_EVENTS) {
+                debug("end");
+            }
         });
 
         return () => {

@@ -174,7 +174,7 @@ export default class AmbiancePRO implements IDobissProtocol {
         return this._modules$
             .pipe(
                 map((module) => {
-                    if (module.type === 'dimmer') {
+                    if (module.type === 'dimmer' || module.type === '0-10v') {
                         return {
                             ...module,
                             brightnessScale: 10

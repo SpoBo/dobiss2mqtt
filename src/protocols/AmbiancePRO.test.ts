@@ -29,6 +29,7 @@ describe("protocols/AmbiancePRO", function() {
                 modules = [
                     {
                         type: ModuleType.relay,
+                        pollDelayInMs: 0,
                         address: 1,
                         outputs: [
                             {
@@ -45,6 +46,7 @@ describe("protocols/AmbiancePRO", function() {
                     },
                     {
                         type: ModuleType.dimmer,
+                        pollDelayInMs: 0,
                         address: 2,
                         outputs: [
                             {
@@ -61,6 +63,7 @@ describe("protocols/AmbiancePRO", function() {
                     },
                     {
                         type: ModuleType.volt,
+                        pollDelayInMs: 0,
                         address: 3,
                         outputs: [
                             {

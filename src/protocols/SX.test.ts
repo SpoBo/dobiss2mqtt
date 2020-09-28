@@ -30,6 +30,7 @@ describe("protocols/SX", function() {
                     {
                         type: ModuleType.relay,
                         address: 1,
+                        pollDelayInMs: 0,
                         outputs: [
                             {
                                 name: "berging",
@@ -46,6 +47,7 @@ describe("protocols/SX", function() {
                     {
                         type: ModuleType.dimmer,
                         address: 2,
+                        pollDelayInMs: 0,
                         outputs: [
                             {
                                 name: "nachthal",

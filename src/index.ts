@@ -22,6 +22,7 @@ import {
     take,
     tap,
     startWith,
+    delay,
 } from "rxjs/operators";
 
 import { RxMqtt } from "./rx-mqtt";
@@ -111,7 +112,7 @@ const processor$ = combineLatest(
                                             via_device: canIdentifier,
                                         },
                                         "name": output.name,
-                                        "optimistic": false,
+                                        "optimistic": module.pollDelayInMs > 0,
                                         "schema": "json",
                                         "stat_t": `~/state`,
                                         "unique_id": id,
@@ -158,6 +159,7 @@ const processor$ = combineLatest(
 
                                                         return action$
                                                             .pipe(
+                                                                delay(module.pollDelayInMs),
                                                                 tap({
                                                                     next() {
                                                                         debug('completed request to set state to %s for module %d and output %d (%s). going to manually poll module states.', request.state, module.address, output.address, output.name)

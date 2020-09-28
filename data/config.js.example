@@ -58,5 +58,16 @@ module.exports = {
                 "zolder_2",
             ]
         },
+        {
+            type: "dimmer",
+            number: 3,
+            // Set to 0 if you want no delay.
+            // This is the delay after which we poll the module again.
+            // If left unspecified it will automatically wait 2s to poll for dimmer modules.
+            pollDelayInMs: 500,
+            outputs: [
+                "tv_atmosphere"
+            ]
+         }
     ]
 }

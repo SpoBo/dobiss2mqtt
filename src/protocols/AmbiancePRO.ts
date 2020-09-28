@@ -75,8 +75,6 @@ function convertModuleTypeToNumber(moduleType: ModuleType): number {
             return 0x10;
         case ModuleType.volt:
             return 0x18;
-        case ModuleType.voltDimmer:
-            return 0xFF;
         default:
             throw new Error("Unmapped ModuleType");
     }
@@ -180,7 +178,7 @@ export default class AmbiancePRO implements IDobissProtocol {
         return this._modules$
             .pipe(
                 map((module) => {
-                    if (module.type === 'dimmer' || module.type === '0-10v' || module.type === '0-10v-dimmer') {
+                    if (module.type === 'dimmer' || module.type === '0-10v') {
                         return {
                             ...module,
                             brightnessScale: 100

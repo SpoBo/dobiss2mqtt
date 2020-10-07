@@ -22,6 +22,7 @@ import {
     take,
     tap,
     startWith,
+    delay,
 } from "rxjs/operators";
 
 import { RxMqtt } from "./rx-mqtt";
@@ -111,7 +112,7 @@ const processor$ = combineLatest(
                                             via_device: canIdentifier,
                                         },
                                         "name": output.name,
-                                        "optimistic": false,
+                                        "optimistic": module.pollDelayInMs > 0,
                                         "schema": "json",
                                         "stat_t": `~/state`,
                                         "unique_id": id,
@@ -158,9 +159,10 @@ const processor$ = combineLatest(
 
                                                         return action$
                                                             .pipe(
+                                                                delay(module.pollDelayInMs),
                                                                 tap({
                                                                     next() {
-                                                                        debug('completed request to set state to %s for module %d and output %d (%s)', request.state, module.address, output.address, output.name)
+                                                                        debug('completed request to set state to %s for module %d and output %d (%s). going to manually poll module states.', request.state, module.address, output.address, output.name)
                                                                         // As a side-effect,
                                                                         // trigger a manual ping on success.
                                                                         manualPing$
@@ -178,7 +180,7 @@ const processor$ = combineLatest(
                                     .pipe(
                                         switchMap((pollInterval) => {
                                             if (!pollInterval) {
-                                                debug("polling disabled")
+                                                debug("polling disabled. will not automatically poll module.")
                                                 return empty()
                                             }
 
@@ -227,7 +229,7 @@ const processor$ = combineLatest(
                                                 .pipe(
                                                     // Only continue when the state effectively changed.
                                                     distinctUntilChanged((a, b) => {
-                                                        return a.powered === b.powered && a.brightness === b.brightness;
+                                                        return a.powered === b.powered && a.level === b.level;
                                                     }),
                                                     tap({
                                                         next(a) {
@@ -248,15 +250,17 @@ const processor$ = combineLatest(
                                                         }
 
                                                         if (output.dimmable) {
-                                                            state.brightness = update.brightness ?? 0
+                                                            state.brightness = update.level ?? 0
                                                         }
 
                                                         const payload = JSON.stringify(state);
+                                                        const topic = output.config.stat_t.replace("~", output.config["~"])
+                                                        debug('going to emit new payload of %j for module %d and output %d on topic %s', state, module.address, output.address)
 
                                                         return mqttClient
                                                             .publish$(
                                                                 // TODO: get the configured url for the endpoint.
-                                                                output.config.stat_t.replace("~", output.config["~"]),
+                                                                topic,
                                                                 payload,
                                                                 {
                                                                     qos: 1,
@@ -300,6 +304,10 @@ const processor$ = combineLatest(
             );
         }),
     );
+
+// TODO: log ENV var containing the commit hash.
+// TODO: Set that ENV var during Dockerfile build.
+debug('starting up')
 
 processor$
     .pipe(

@@ -12,20 +12,22 @@ module.exports = {
         //       I prefer something which just maps 1:1.
         url: 'mqtt://username:password@host'
     },
-    // Can also be 0 to fully disable automated polling.
+    // Can also be 0 to fully disable automated polling. Expressed in milliseconds.
     // It will then only poll once after every action.
     // Downside is then that the state will not be correct if you use your wall switches to toggle the outputs.
     // Upside is that your CAN Controller will not be spammed and that there will be less conflict with the native dobiss apps.
-    //
     pollIntervalInMs: 1000,
     modules: [
         {
-            // For now only "relay" and "dimmer" work. So we can only turn outputs on or off or dim a light to X %
-            // But these might be supported in the future: "0-10v"
+            // "relay", "dimmer" or "0-10v" should work. So we can only turn outputs on or off or set a dimmer / 0-10v module to X %
+            // 0-10v & 'dimmer' will expose all outputs on it as lights automatically.
+            // In the future this might be configurable per output.
+            // Perhaps some things are fans and not lights etc.
             type: 'relay',
             // Either manually set the number of the relay or let dobiss2mqtt set the number automatically
             // depending on the order of the module in the array.
-            // The first one is always 1. The protocol automatically maps it to a weird internal number if it is required.
+            // The first one is always 1 in dobiss2mqtt.
+            // Dobiss2MQTT will map the number to the weird internal number required by the dobiss protocol.
             number: 1,
             // The outputs (or lights in my case) are just represented as strings which are used to
             // give them their names.
@@ -56,5 +58,16 @@ module.exports = {
                 "zolder_2",
             ]
         },
+        {
+            type: "dimmer",
+            number: 3,
+            // Set to 0 if you want no delay.
+            // This is the delay after which we poll the module again.
+            // If left unspecified it will automatically wait 2s to poll for dimmer modules.
+            pollDelayInMs: 500,
+            outputs: [
+                "tv_atmosphere"
+            ]
+         }
     ]
 }

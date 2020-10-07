@@ -29,6 +29,7 @@ describe("protocols/AmbiancePRO", function() {
                 modules = [
                     {
                         type: ModuleType.relay,
+                        pollDelayInMs: 0,
                         address: 1,
                         outputs: [
                             {
@@ -45,6 +46,7 @@ describe("protocols/AmbiancePRO", function() {
                     },
                     {
                         type: ModuleType.dimmer,
+                        pollDelayInMs: 0,
                         address: 2,
                         outputs: [
                             {
@@ -54,6 +56,23 @@ describe("protocols/AmbiancePRO", function() {
                             },
                             {
                                 name: "office",
+                                address: 1,
+                                dimmable: true
+                            }
+                        ]
+                    },
+                    {
+                        type: ModuleType.volt,
+                        pollDelayInMs: 0,
+                        address: 3,
+                        outputs: [
+                            {
+                                name: "living",
+                                address: 0,
+                                dimmable: true
+                            },
+                            {
+                                name: "kitchen",
                                 address: 1,
                                 dimmable: true
                             }
@@ -70,7 +89,7 @@ describe("protocols/AmbiancePRO", function() {
                     instance = new AmbiancePRO({ socketClient: client, modules$: from(modules) })
                 })
 
-                describe("when we poll the first module", function() {
+                describe("when we poll the first module (relay)", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const poll$ = instance
@@ -202,7 +221,7 @@ describe("protocols/AmbiancePRO", function() {
                     });
                 });
 
-                describe("when we poll the second module", function() {
+                describe("when we poll the second module (dimmer)", function() {
                     let result: ObservableInspector
                     beforeEach(function() {
                         const poll$ = instance
@@ -317,12 +336,12 @@ describe("protocols/AmbiancePRO", function() {
                                 {
                                     output: modules[1].outputs[0],
                                     powered: true,
-                                    brightness: 1
+                                    level: 1
                                 },
                                 {
                                     output: modules[1].outputs[1],
                                     powered: true,
-                                    brightness: 100
+                                    level: 100
                                 },
                             ])
                         })
@@ -407,7 +426,7 @@ describe("protocols/AmbiancePRO", function() {
                                 {
                                     output: modules[1].outputs[0],
                                     powered: true,
-                                    brightness: 50
+                                    level: 50
                                 },
                                 {
                                     output: modules[1].outputs[1],
@@ -417,6 +436,222 @@ describe("protocols/AmbiancePRO", function() {
                         })
                     })
                 });
+
+                describe('when we poll the third module (volt)', function() {
+                    let result: ObservableInspector
+                    beforeEach(function() {
+                        const poll$ = instance
+                            .pollModule(3)
+
+                        result = new ObservableInspector(poll$)
+                    })
+
+                    afterEach(function() {
+                        result.stop()
+                    })
+
+                    test("it should have sent the correct request to the socket", function() {
+                        expect(client.request).toHaveBeenCalledWith(
+                            Buffer.from([
+                                0xAF,
+                                0x01, // 1 for poll
+                                0x18, // for volt module
+                                0x03, // 3 for module address
+                                0x00,
+                                0x00,
+                                0x08,
+                                0x01,
+
+                                0x00,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xFF,
+                                0xAF,
+                            ])
+                        )
+                    });
+
+                    describe('when we see a response indicating that output 1 is dimmed to a min of 1% and output 2 set to a max of 100', function() {
+                        beforeEach(function() {
+                            return clientControl
+                                .next(
+                                    Buffer.from([
+                                        0xaf,
+                                        0x01,
+                                        0x08,
+                                        0x02,
+                                        0x00,
+                                        0x00,
+                                        0x08,
+                                        0x01,
+                                        0x00,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xaf,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0x01,
+                                        0x64,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff
+                                    ])
+                                )
+                        })
+
+                        test('we should receive an output state of {1,powered,1%} and {2,powered,100%}', function() {
+                            expect(result.items).toEqual([
+                                {
+                                    output: modules[2].outputs[0],
+                                    powered: true,
+                                    level: 1
+                                },
+                                {
+                                    output: modules[2].outputs[1],
+                                    powered: true,
+                                    level: 100
+                                },
+                            ])
+                        })
+                    })
+
+
+                    describe('when we see a response indicating that output 1 is dimmed to 50% and output 2 set to off', function() {
+                        beforeEach(function() {
+                            return clientControl
+                                .next(
+                                    Buffer.from([
+                                        0xaf,
+                                        0x01,
+                                        0x08,
+                                        0x02,
+                                        0x00,
+                                        0x00,
+                                        0x08,
+                                        0x01,
+                                        0x00,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xaf,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0x32,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff,
+                                        0xff
+                                    ])
+                                )
+                        })
+
+                        test('we should receive an output state of {1,powered,1%} and {2,powered,100%}', function() {
+                            expect(result.items).toEqual([
+                                {
+                                    output: modules[2].outputs[0],
+                                    powered: true,
+                                    level: 50
+                                },
+                                {
+                                    output: modules[2].outputs[1],
+                                    powered: false
+                                },
+                            ])
+                        })
+                    })
+                })
 
                 describe("when we ask to turn on the second output on the first module", function() {
 
@@ -596,7 +831,6 @@ describe("protocols/AmbiancePRO", function() {
                     });
 
                 });
-
 
                 describe("when we ask to dim the first output on the second module to 50%", function() {
 

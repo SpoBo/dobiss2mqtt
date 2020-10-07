@@ -13,8 +13,9 @@ export type IOutputState = {
     powered: boolean;
     /**
      * If the output is dimmable and dimmed this can be a specific brightness.
+     * Or if it is a 0-10v relay it can mean how much power is delivered.
      */
-    brightness?: number;
+    level?: number;
 };
 
 /**
@@ -33,7 +34,7 @@ export interface IDobissProtocol extends IDobissModulesConfig {
     // TODO: We could return null or IOutputState if the protocol immediately receives the new states.
     //       In that case we could only manually trigger the module poll if we receive null.
     //       Otherwise we assume no polling is needed.
-    on: (moduleAddress: number, outputAddress: number, brightness?: number) => Observable<null>;
+    on: (moduleAddress: number, outputAddress: number, level?: number) => Observable<null>;
 
     off: (moduleAddress: number, outputAddress: number) => Observable<null>;
 

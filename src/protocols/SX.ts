@@ -11,7 +11,7 @@ import {
     map,
 } from "rxjs/operators";
 
-import RxSocket, { IRequestResponseBuffer } from "../rx-socket";
+import { IRequestResponseBuffer } from "../rx-socket";
 
 import {
     IDobiss2MqttModule,
@@ -40,12 +40,12 @@ function convertModuleToModuleId(module: IDobiss2MqttModule) {
     return module.address + 64;
 }
 
-function getActionValue(actionType: number, dimmable: boolean, brightness?: number): number {
+function getActionValue(actionType: number, dimmable: boolean, level?: number): number {
     if (!dimmable) {
         return actionType
     }
 
-    return (brightness ?? (actionType === ACTION_TYPES.on ? 10 : 0)) * BRIGHTNESS_SCALE
+    return (level ?? (actionType === ACTION_TYPES.on ? 10 : 0)) * BRIGHTNESS_SCALE
 }
 
 function createOutputsBuffer({ batch, moduleId }: { batch: IDobiss2MqttOutput[]; moduleId: number }): Buffer {
@@ -97,16 +97,16 @@ export default class SX implements IDobissProtocol {
     }
 
     /**
-     * @param {number} [brightness]
-     *   Since we configure it to only step to 10 maximum, we will receive a value of 0-10 for brightness.
+     * @param {number} [level]
+     *   Since we configure it to only step to 10 maximum, we will receive a value of 0-10 for level.
      */
-    public on (moduleAddress: number, outputAddress: number, brightness?: number): Observable<null> {
+    public on (moduleAddress: number, outputAddress: number, level?: number): Observable<null> {
         return this.modules$
             .pipe(
                 withModuleAndOutput(moduleAddress, outputAddress),
                 switchMap(([ module, output ]) => {
                     if (output) {
-                        return this.action(module, output, ACTION_TYPES.on, brightness);
+                        return this.action(module, output, ACTION_TYPES.on, level);
                     }
 
                     return empty()
@@ -206,7 +206,7 @@ export default class SX implements IDobissProtocol {
                                                 }
 
                                                 if (output.dimmable && module.brightnessScale) {
-                                                    result.brightness = (state - (state % module.brightnessScale)) / module.brightnessScale
+                                                    result.level = (state - (state % module.brightnessScale)) / module.brightnessScale
                                                 }
 
                                                 acc.push(result);
@@ -227,8 +227,8 @@ export default class SX implements IDobissProtocol {
             )
     }
 
-    private action (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number, brightness?: number): Observable<null> {
-        const action = getActionValue(actionType, output.dimmable, brightness)
+    private action (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number, level?: number): Observable<null> {
+        const action = getActionValue(actionType, output.dimmable, level)
 
         const buffer = Buffer
             .from([

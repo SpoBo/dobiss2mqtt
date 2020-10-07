@@ -1,3 +1,5 @@
+import DEBUG from "debug";
+
 import {
     from,
     Observable,
@@ -8,7 +10,6 @@ import {
     mapTo,
     switchMap,
     map,
-    filter,
 } from "rxjs/operators";
 
 import { IRequestResponseBuffer } from "../rx-socket";
@@ -28,7 +29,10 @@ import {
 import {
     convertBufferToByteArray,
 } from "../helpers";
+
 import withModuleAndOutput from "../operators/withModuleAndOutput";
+
+const debug = DEBUG("dobiss2mqtt.protocol.ambiance-pro");
 
 enum ACTION_TYPES {
     toggle = 0x02,
@@ -60,7 +64,7 @@ type SimpleActionBufferOptions = {
     moduleAddress: number;
     outputAddress: number;
     actionType: ACTION_TYPES;
-    brightness?: number;
+    level?: number;
 };
 
 function convertModuleTypeToNumber(moduleType: ModuleType): number {
@@ -84,7 +88,7 @@ function createSimpleActionBuffer(options: SimpleActionBufferOptions): Buffer {
             options.actionType,
             0xFF, // delay on
             0xFF, // delay off
-            options.brightness ?? 0x64, // dimmer (0x0 to 0x64 = 100%) So it's basically 100%.
+            options.level ?? 0x64, // dimmer (0x0 to 0x64 = 100%) So it's basically 100%.
             0xFF, // dimmer speed
             0xFF, // not used
         ]);
@@ -156,13 +160,13 @@ export default class AmbiancePRO implements IDobissProtocol {
             )
     }
 
-    public on (moduleAddress: number, outputAddress: number, brightness?: number): Observable<null> {
+    public on (moduleAddress: number, outputAddress: number, level?: number): Observable<null> {
         return this.modules$
             .pipe(
                 withModuleAndOutput(moduleAddress, outputAddress),
                 switchMap(([ module, output ]) => {
                     if (output) {
-                        return this.action(module, output, ACTION_TYPES.on, brightness);
+                        return this.action(module, output, ACTION_TYPES.on, level);
                     }
 
                     return empty()
@@ -174,10 +178,10 @@ export default class AmbiancePRO implements IDobissProtocol {
         return this._modules$
             .pipe(
                 map((module) => {
-                    if (module.type === 'dimmer') {
+                    if (module.type === 'dimmer' || module.type === '0-10v') {
                         return {
                             ...module,
-                            brightnessScale: 10
+                            brightnessScale: 100
                         };
                     }
 
@@ -203,9 +207,11 @@ export default class AmbiancePRO implements IDobissProtocol {
                         .pipe(
                             switchMap((response) => {
                                 const byteArray = convertBufferToByteArray(response);
+                                debug('response of poll for module %d is %s', module.address, byteArray)
                                 const startBit = 4 * 8;
 
                                 const states = byteArray.slice(startBit, startBit + 12);
+                                debug('states for above module poll response %s', states)
 
                                 const combined = states
                                     .reduce((acc, state, index) => {
@@ -225,7 +231,7 @@ export default class AmbiancePRO implements IDobissProtocol {
                                         }
 
                                         if (output.dimmable && out.powered) {
-                                            out.brightness = state;
+                                            out.level = state;
                                         }
 
                                         acc.push(out);
@@ -240,7 +246,7 @@ export default class AmbiancePRO implements IDobissProtocol {
             )
     }
 
-    private action (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number, brightness?: number): Observable<null> {
+    private action (module: IDobiss2MqttModule, output: IDobiss2MqttOutput, actionType: number, level?: number): Observable<null> {
         const header = createActionHeaderPayload(
             {
                 moduleAddress: module.address,
@@ -253,7 +259,7 @@ export default class AmbiancePRO implements IDobissProtocol {
                 actionType,
                 moduleAddress: module.address,
                 outputAddress: output.address,
-                brightness
+                level
             },
         );
 

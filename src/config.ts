@@ -14,6 +14,28 @@ convict.addParser({
 });
 
 convict.addFormat({
+    name: "nat-or-null",
+    coerce: (v: any) => {
+        if (v === null) {
+            return null;
+        }
+
+        return Number(v);
+    },
+    validate: (v: any) => {
+        if (null) {
+            return null;
+        }
+
+        if (Number.isInteger(v) && v >= 0) {
+            return v
+        }
+
+        throw new TypeError("Needs to be a positive number or 0 or null.");
+    },
+});
+
+convict.addFormat({
     name: "mqtt-locator",
     validate: (v: any) => {
         if (!v) {
@@ -138,6 +160,11 @@ const CONVICT_SCHEMA = {
                       and controlled differently.`,
                 format: ["relay", "dimmer", "0-10v"],
             },
+            pollDelayInMs: {
+                default: null,
+                doc: `When this is set to a value higher than 0, wait this many milliseconds before we poll after we performed an action on the module. If it is left at null then we will automatically wait 2000ms on dimmer modules because they are probably be on a timer.`,
+                format: 'nat-or-null',
+            },
         },
         default: [],
         format: "modules-array",
@@ -180,12 +207,14 @@ export interface IConfigModule {
     type: ModuleType;
     address: number | null;
     outputs: string[];
+    pollDelayInMs: number | null;
 }
 
 export interface IDobiss2MqttModule {
     type: ModuleType;
     // NOTE: This is NOT index-based.
     address: number;
+    pollDelayInMs: number;
     outputs: IDobiss2MqttOutput[];
 }
 
@@ -234,10 +263,11 @@ export default class ConfigManager {
                                         return {
                                             address: outputIndex,
                                             name,
-                                            dimmable: module.type === ModuleType.dimmer
+                                            dimmable: module.type === ModuleType.dimmer || module.type === ModuleType.volt
                                         };
                                     }),
                                 type: module.type,
+                                pollDelayInMs: module.pollDelayInMs === null ? _getDefaultPollDelayInMsForModule(module.type) : module.pollDelayInMs
                             };
                         });
 
@@ -282,5 +312,12 @@ export default class ConfigManager {
                 }),
             );
     }
+}
 
+function _getDefaultPollDelayInMsForModule(type: ModuleType): number {
+    if (type === 'dimmer') {
+        return 2000
+    }
+
+    return 0
 }

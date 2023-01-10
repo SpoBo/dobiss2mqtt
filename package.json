@@ -18,7 +18,7 @@
         "node": "13.9.0"
     },
     "dependencies": {
-        "convict": "^5.2.0",
+        "convict": "^6.2.4",
         "debug": "^4.1.1",
         "mqtt": "^3.0.0",
         "ms": "^2.1.2",

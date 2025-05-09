@@ -20,6 +20,10 @@ connected. Which means that the native dobiss apps might encounter issues.
 It will make a *lot* of requests to your CAN Programmer since it'll poll for
 the state of every relay you have.
 
+## Alternatives
+
+https://github.com/VandenboschVincent/DobissConnector is an alternate implementation in .NET. It has a REST API and a small web UI to toggle switches.
+
 ## Config
 
 See [data/config.js.example](data/config.js.example) for the main configuration. Rename it

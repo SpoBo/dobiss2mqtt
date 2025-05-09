@@ -22,7 +22,7 @@ the state of every relay you have.
 
 ## Alternatives
 
-https://github.com/VandenboschVincent/DobissConnector is an alternate implementation in .NET. It has a REST API and a small web UI to toggle switches.
+https://github.com/VandenboschVincent/DobissConnector is an alternate implementation in .NET. It has a REST API which is not present in dobiss2mqtt.
 
 ## Config
 
